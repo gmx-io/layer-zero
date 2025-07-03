@@ -58,15 +58,15 @@ const config: HardhatUserConfig = {
             eid: EndpointId.SEPOLIA_V2_TESTNET,
             url: process.env.RPC_URL_ETHEREUM_TESTNET || 'https://rpc.sepolia.org/',
             accounts,
+        },
+        'arbitrum-testnet': {
+            eid: EndpointId.ARBSEP_V2_TESTNET,
+            url: process.env.RPC_URL_ARBITRUM_TESTNET || 'https://sepolia-rollup.arbitrum.io/rpc',
+            accounts,
             oftAdapter: {
                 gmTokenAddress: '0xb6fC4C9eB02C35A134044526C62bb15014Ac0Bcc',
                 glvTokenAddress: '0xAb3567e55c205c62B141967145F37b7695a9F854',
             },
-        },
-        'arbitrum-testnet': {
-            eid: EndpointId.ARBITRUM_V2_TESTNET,
-            url: process.env.RPC_URL_ARBITRUM_TESTNET || 'https://sepolia-rollup.arbitrum.io/rpc',
-            accounts,
         },
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit

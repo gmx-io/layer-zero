@@ -7,12 +7,12 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/tool
 
 const ethereumSepoliaContract: OmniPointHardhat = {
     eid: EndpointId.SEPOLIA_V2_TESTNET,
-    contractName: 'GM_Adapter',
+    contractName: 'MarketToken_OFT',
 }
 
 const arbitrumSepoliaContract: OmniPointHardhat = {
     eid: EndpointId.ARBSEP_V2_TESTNET,
-    contractName: 'GM_OFT',
+    contractName: 'MarketToken_Adapter',
 }
 
 const EVM_ENFORCED_OPTIONS_LZ_RECEIVE: OAppEnforcedOption[] = [

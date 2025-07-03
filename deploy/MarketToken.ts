@@ -4,7 +4,13 @@ import { type DeployFunction, DeployResult } from 'hardhat-deploy/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-const contractName = 'GM'
+const contractName = 'MarketToken'
+
+const adapterContractName = 'MarketToken_Adapter'
+const oftContractName = 'MarketToken_OFT'
+
+const tokenName = 'GMX Market'
+const tokenSymbol = 'GM'
 
 const deploy: DeployFunction = async (hre) => {
     const { getNamedAccounts, deployments } = hre
@@ -22,34 +28,40 @@ const deploy: DeployFunction = async (hre) => {
     const eid = hre.network.config.eid
     const networkName = hre.network.name
 
+    let deployingContractName = oftContractName
     let oftDeployment: DeployResult
 
-    if (eid === EndpointId.SEPOLIA_V2_TESTNET || eid === EndpointId.ETHEREUM_V2_MAINNET) {
-        console.log(`Deploying ${contractName} lockbox adapter on ${networkName}`)
-        const gmTokenAddress = hre.network.config.oftAdapter?.gmTokenAddress
+    if (eid === EndpointId.ARBSEP_V2_TESTNET || eid === EndpointId.ARBITRUM_V2_MAINNET) {
+        deployingContractName = adapterContractName
 
+        const gmTokenAddress = hre.network.config.oftAdapter?.gmTokenAddress
         if (!gmTokenAddress) {
             console.warn(`oftAdapter not configured on network config, skipping GM Adapter deployment`)
             return
         }
 
-        oftDeployment = await deploy(contractName, {
+        console.log(
+            `Deploying ${adapterContractName} lockbox adapter on ${networkName} with innerToken address: ${gmTokenAddress}`
+        )
+        oftDeployment = await deploy(adapterContractName, {
             from: deployer,
             args: [
                 gmTokenAddress, // token address
-                endpointV2Deployment.address, // LayerZero's EndpointV2 address
+                endpointV2Deployment.address,
                 deployer, // owner
             ],
             log: true,
             skipIfAlreadyDeployed: true,
         })
     } else {
-        console.log(`Deploying ${contractName} OFT`)
+        console.log(`Deploying ${oftContractName} OFT with token name: ${tokenName} and symbol: ${tokenSymbol}`)
 
-        oftDeployment = await deploy(contractName, {
+        oftDeployment = await deploy(oftContractName, {
             from: deployer,
             args: [
-                endpointV2Deployment.address, // LayerZero's EndpointV2 address
+                tokenName,
+                tokenSymbol,
+                endpointV2Deployment.address,
                 deployer, // owner
             ],
             log: true,
@@ -57,7 +69,9 @@ const deploy: DeployFunction = async (hre) => {
         })
     }
 
-    console.log(`Deployed contract: ${contractName}, network: ${networkName}, address: ${oftDeployment.address}`)
+    console.log(
+        `Deployed contract: ${deployingContractName}, network: ${networkName}, address: ${oftDeployment.address}`
+    )
 }
 
 deploy.tags = [contractName]

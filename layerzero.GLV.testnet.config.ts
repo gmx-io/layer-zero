@@ -61,14 +61,14 @@ export default async function () {
             {
                 contract: ethereumSepoliaContract,
                 config: {
-                    delegate: '0xEc80F80844e110f52b223cAFc5D5D69178D4c62b',
+                    delegate: '0xCD9706B6B71fdC4351091B5b1D910cEe7Fde28D0',
                     owner: '0xEc80F80844e110f52b223cAFc5D5D69178D4c62b',
                 },
             },
             {
                 contract: arbitrumSepoliaContract,
                 config: {
-                    delegate: '0xEc80F80844e110f52b223cAFc5D5D69178D4c62b',
+                    delegate: '0xCD9706B6B71fdC4351091B5b1D910cEe7Fde28D0',
                     owner: '0xEc80F80844e110f52b223cAFc5D5D69178D4c62b',
                 },
             },

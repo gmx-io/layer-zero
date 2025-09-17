@@ -14,6 +14,7 @@ import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
 import './type-extensions'
+import './tasks/validate-config'
 
 // Set your preferred authentication method
 //
@@ -54,6 +55,36 @@ const config: HardhatUserConfig = {
         ],
     },
     networks: {
+        'arbitrum-mainnet': {
+            eid: EndpointId.ARBITRUM_V2_MAINNET,
+            url: process.env.RPC_URL_ARBITRUM_MAINNET,
+            accounts,
+        },
+        'base-mainnet': {
+            eid: EndpointId.BASE_V2_MAINNET,
+            url: process.env.RPC_URL_BASE_MAINNET,
+            accounts,
+        },
+        'bera-mainnet': {
+            eid: EndpointId.BERA_V2_MAINNET,
+            url: process.env.RPC_URL_BERA_MAINNET,
+            accounts,
+        },
+        'bsc-mainnet': {
+            eid: EndpointId.BSC_V2_MAINNET,
+            url: process.env.RPC_URL_BSC_MAINNET,
+            accounts,
+        },
+        'botanix-mainnet': {
+            eid: EndpointId.BOTANIX_V2_MAINNET,
+            url: process.env.RPC_URL_BOTANIX_MAINNET,
+            accounts,
+        },
+        'ethereum-mainnet': {
+            eid: EndpointId.ETHEREUM_V2_MAINNET,
+            url: process.env.RPC_URL_ETHEREUM_MAINNET,
+            accounts,
+        },
         'sepolia-testnet': {
             eid: EndpointId.SEPOLIA_V2_TESTNET,
             url: process.env.RPC_URL_ETHEREUM_TESTNET || 'https://rpc.sepolia.org/',
@@ -63,10 +94,6 @@ const config: HardhatUserConfig = {
             eid: EndpointId.ARBSEP_V2_TESTNET,
             url: process.env.RPC_URL_ARBITRUM_TESTNET || 'https://sepolia-rollup.arbitrum.io/rpc',
             accounts,
-            oftAdapter: {
-                gmTokenAddress: '0xb6fC4C9eB02C35A134044526C62bb15014Ac0Bcc',
-                glvTokenAddress: '0xAb3567e55c205c62B141967145F37b7695a9F854',
-            },
         },
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit

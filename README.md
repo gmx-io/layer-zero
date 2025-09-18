@@ -1,195 +1,480 @@
-<p align="center">
-  <a href="https://layerzero.network">
-    <img alt="LayerZero" style="max-width: 500px" src="https://d3a2dpnnrypp5h.cloudfront.net/bridge-app/lz.png"/>
-  </a>
-</p>
-<h1 align="center">MintBurnOFTAdapter Example</h1>
+# GMX Liquidity Vault (GLV) & GM Token Deployment
 
-<p align="center">
-  <a href="https://docs.layerzero.network/contracts/oft" style="color: #a77dff">Quickstart</a> | <a href="https://docs.layerzero.network/contracts/oapp-configuration" style="color: #a77dff">Configuration</a> | <a href="https://docs.layerzero.network/contracts/options" style="color: #a77dff">Message Execution Options</a> | <a href="https://docs.layerzero.network/contracts/endpoint-addresses" style="color: #a77dff">Endpoint Addresses</a>
-</p>
+This project provides a comprehensive deployment and configuration system for GMX Liquidity Vault (GLV) and GM tokens across multiple blockchain networks using LayerZero's OmniChain technology.
 
-<p align="center">This repository contains an example implementation of the MintBurnOFTAdapter, a variant of the OFTAdapter.sol standard from LayerZero. The purpose of this contract is to enable the deployment of more than one OFTAdapter within the mesh network, by utilziing an already deployed ERC20 token's external mint and burn methods on each chain.</p>
+## 📋 Table of Contents
 
-<p align="center">
-  <a href="https://layerzero.network" style="color: #a77dff">Homepage</a> | <a href="https://docs.layerzero.network/" style="color: #a77dff">Docs</a> | <a href="https://layerzero.network/developers" style="color: #a77dff">Developers</a>
-</p>
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [LayerZero Wiring](#layerzero-wiring)
+- [Validation](#validation)
+- [Project Structure](#project-structure)
 
----
+## 🚀 Setup
 
-- [Usage](#usage)
-  - [Developing Contracts](#developing-contracts)
-    - [Installing dependencies](#installing-dependencies)
-    - [Compiling your contracts](#compiling-your-contracts)
-    - [Running tests](#running-tests)
-  - [Deploying Contracts](#deploying-contracts)
-- [What is an OFT Adapter?](#what-is-an-oft-adapter)
-- [Key Features](#key-features)
-- [Deployment Requirements](#deployment-requirements)
-- [MintBurnOFTAdapter](#mintburnoftadapter)
-- [Requirement](#requirement)
-- [Contracts Structure](#contracts-structure)
-  - [`MinterBurner`](#minterburner)
-  - [`MintBurnOFTAdapter.sol`](#mintburnoftadaptersol)
-    - [Variables](#variables-1)
-    - [Functions](#functions-1)
+### Prerequisites
+- Node.js 18+
+- pnpm (package manager)
+- Private keys for deployer accounts
 
-## Usage
+### Environment Variables
 
-### OFTAdapter additional setup:
+Create a `.env` file with the following variables:
 
-- In your `hardhat.config.ts` file, add the following configuration to the network you want to deploy the OFTAdapter to:
-  ```typescript
-  // Replace `0x0` with the address of the ERC20 token you want to adapt to the OFT functionality.
-  oftAdapter: {
-      tokenAddress: '0x0',
-  }
-  ```
+```bash
+# Deployer Private Keys (Required)
+PRIVATE_KEY_GM_DEPLOYER=0x...    # Private key for GM token deployments
+PRIVATE_KEY_GLV_DEPLOYER=0x...   # Private key for GLV token deployments
 
-### Developing Contracts
+# Optional: Public keys for reference
+PUBLIC_KEY_GM_DEPLOYER=0x...
+PUBLIC_KEY_GLV_DEPLOYER=0x...
 
-#### Installing dependencies
+# Mainnet RPCs
+RPC_URL_ARBITRUM_MAINNET=https://...
+RPC_URL_BASE_MAINNET=https://...
+RPC_URL_BSC_MAINNET=https://...
+RPC_URL_BOTANIX_MAINNET=https://...
+RPC_URL_BERA_MAINNET=https://...
+RPC_URL_ETHEREUM_MAINNET=https://...
 
-We recommend using `pnpm` as a package manager (but you can of course use a package manager of your choice):
+# Testnet RPCs
+RPC_URL_ARBITRUM_TESTNET=https://...
+RPC_URL_ETHEREUM_TESTNET=https://...
+
+```
+
+### Installation
 
 ```bash
 pnpm install
 ```
 
-#### Compiling your contracts
+## ⚙️ Configuration
 
-This project supports both `hardhat` and `forge` compilation. By default, the `compile` command will execute both:
+### Market Pairs
 
-```bash
-pnpm compile
-```
+The project supports multiple market pairs configured in `devtools/config/tokens.ts`:
 
-If you prefer one over the other, you can use the tooling-specific commands:
+- **`WETH_USDC`** - WETH/USDC pair (Arbitrum mainnet hub)
+- **`WBTC_USDC`** - WBTC/USDC pair (Arbitrum mainnet hub)  
+- **`WETH_USDC_SG`** - WETH/USDC Staging (Arbitrum testnet hub)
 
-```bash
-pnpm compile:forge
-pnpm compile:hardhat
-```
+Each market pair contains:
+- **GM Token**: Market token configuration
+- **GLV Token**: Liquidity vault token configuration
+- **Hub Network**: Primary network with existing token contracts (deploys adapters)
+- **Expansion Networks**: Networks where OFT tokens will be deployed
 
-Or adjust the `package.json` to for example remove `forge` build:
+**⚠️ Important**: Do **NOT** include the hub network EID in the expansion networks list. The system automatically validates this and will error if hub networks are found in expansion networks.
 
-```diff
-- "compile": "$npm_execpath run compile:forge && $npm_execpath run compile:hardhat",
-- "compile:forge": "forge build",
-- "compile:hardhat": "hardhat compile",
-+ "compile": "hardhat compile"
-```
+### Network Configuration
 
-#### Running tests
+Network settings are defined in `devtools/config/networks.ts`:
 
-Similarly to the contract compilation, we support both `hardhat` and `forge` tests. By default, the `test` command will execute both:
+- **Block Confirmations**: Required confirmations per network
+- **Ownership Transfer**: Owner addresses for deployed contracts
+- **Expansion Networks**: Testnet and mainnet expansion network lists
 
-```bash
-pnpm test
-```
+## 🚀 Deployment
 
-If you prefer one over the other, you can use the tooling-specific commands:
+### Quick Start
 
 ```bash
-pnpm test:forge
-pnpm test:hardhat
+# 1. First, validate your configuration
+MARKET_PAIR=WETH_USDC npx hardhat validate-config
+
+# 2. Then deploy to all configured networks
+MARKET_PAIR=WETH_USDC npx hardhat lz:deploy
+
+# Or deploy to specific networks
+MARKET_PAIR=WBTC_USDC npx hardhat deploy --network arbitrum-mainnet --tags GlvToken,MarketToken
 ```
 
-Or adjust the `package.json` to for example remove `hardhat` tests:
-
-```diff
-- "test": "$npm_execpath test:forge && $npm_execpath test:hardhat",
-- "test:forge": "forge test",
-- "test:hardhat": "$npm_execpath hardhat test"
-+ "test": "forge test"
-```
-
-### Deploying Contracts
-
-Set up deployer wallet/account:
-
-- Rename `.env.example` -> `.env`
-- Choose your preferred means of setting up your deployer wallet/account:
-
-```
-MNEMONIC="test test test test test test test test test test test junk"
-or...
-PRIVATE_KEY="0xabc...def"
-```
-
-- Fund this address with the corresponding chain's native tokens you want to deploy to.
-
-To deploy your contracts to your desired blockchains, run the following command in your project's folder:
+### Available Commands
 
 ```bash
-npx hardhat lz:deploy
+# Always validate first!
+MARKET_PAIR=WETH_USDC npx hardhat validate-config
+
+# Deploy all contracts across all networks
+MARKET_PAIR=WETH_USDC npx hardhat lz:deploy
+
+# Deploy only GLV tokens
+MARKET_PAIR=WETH_USDC npx hardhat deploy --tags GlvToken
+
+# Deploy only GM tokens  
+MARKET_PAIR=WBTC_USDC npx hardhat deploy --tags MarketToken
+
+# Deploy to specific network
+MARKET_PAIR=WETH_USDC_SG npx hardhat deploy --network sepolia-testnet
 ```
 
-More information about available CLI arguments can be found using the `--help` flag:
+### Without MARKET_PAIR Environment Variable
+
+If you don't set `MARKET_PAIR`, you'll see available options:
 
 ```bash
-npx hardhat lz:deploy --help
+npx hardhat deploy
+
+# Output:
+❌ No MARKET_PAIR environment variable set.
+
+📋 Available market pairs:
+   MARKET_PAIR=WETH_USDC     # GMX Liquidity Vault [WETH-USDC]
+   MARKET_PAIR=WBTC_USDC     # GMX Liquidity Vault [WBTC-USDC]  
+   MARKET_PAIR=WETH_USDC_SG  # GMX Liquidity Vault [WETH-USDC.SG]
+
+💡 Usage examples:
+   MARKET_PAIR=WETH_USDC     npx hardhat lz:deploy
+   MARKET_PAIR=WBTC_USDC     npx hardhat deploy --network arbitrum-mainnet
 ```
 
-By following these steps, you can focus more on creating innovative omnichain solutions and less on the complexities of cross-chain communication.
+### Deployment Logic
 
-<br></br>
+The deployment system automatically determines:
 
-<p align="center">
-  Join our <a href="https://layerzero.network/community" style="color: #a77dff">community</a>! | Follow us on <a href="https://x.com/LayerZero_Labs" style="color: #a77dff">X (formerly Twitter)</a>
-</p>
+- **Hub Networks**: Deploy adapters (use existing token contracts)
+- **Expansion Networks**: Deploy OFTs (create new bridgeable tokens)
+- **Network Filtering**: Only deploys to networks configured for the selected market pair
+- **Automatic Skipping**: Skips networks not in the market pair's hub or expansion networks
 
-## What is an OFT Adapter?
+**Important**: 
+- Even if your `hardhat.config.ts` defines 10 networks, if your market pair only configures 3 networks (1 hub + 2 expansion), deployments and wiring will **only** occur on those 3 networks. Other networks are automatically skipped.
+- The deploy script deploys **adapters** on hub networks and **OFTs** on expansion networks.
+- Hub networks must **NOT** be included in expansion networks - there's automatic validation that prevents this.
 
-OFT Adapter allows an existing token to expand to any supported chain as a native token with a unified global supply, inheriting all the features of the OFT Standard. This works as an intermediary contract that handles sending and receiving tokens that have already been deployed. Read more [here](https://docs.layerzero.network/v2/developers/evm/oft/adapter).
+### Example Output
 
-Ideally, when you want to convert an existing ERC20 token with its current fixed supply into an Omnichain token, you can use the OFTAdapter as a wrapper around that ERC20.
+```bash
+Network: arbitrum-mainnet
+EID: 30110
+Named Accounts:
+  deployerGM : 0x1234...
+  deployerGLV: 0x5678...
 
-There are several ways to go about it since the base code of OFTAdapter keeps contract logic implementation up to the developer. Eg., the Adapter could be implemented in such a way that the original ERC20 is locked inside the Adapter on chain A and the OFT is minted on chain B.
+Deploying GlvToken_Adapter for WETH_USDC
+Deployed contract: GlvToken_Adapter, network: arbitrum-mainnet, address: 0x...
 
-## Key Features
+Deploying MarketToken_Adapter for WETH_USDC
+Deployed contract: MarketToken_Adapter, network: arbitrum-mainnet, address: 0x...
 
-- **Mint and Burn Access**: Enables the MintBurnOFTAdapter to interact with ERC20 tokens that have minting and burning capabilities. This is crucial for maintaining unified token supply across different blockchain networks in a decentralized manner.
+Network: base-mainnet
+EID: 30184
+Named Accounts:
+  deployerGM : 0x1234...
+  deployerGLV: 0x5678...
 
-- **Access Control Integration**: Ensures that only authorized entities (deployers or specific contracts) have the permissions to mint and burn tokens. This is managed through an access control or allowlist mechanism.
+Deploying GlvToken_OFT for WETH_USDC
+Deployed contract: GlvToken_OFT, network: base-mainnet, address: 0x...
 
-- **Multiple Adapter Deployments**: Supports the deployment of multiple instances of the MintBurnOFTAdapter, each configured with different token contracts and LayerZero endpoints, thus enhancing flexibility in cross-chain operations.
+Deploying MarketToken_OFT for WETH_USDC
+Deployed contract: MarketToken_OFT, network: base-mainnet, address: 0x...
+```
 
-## Deployment Requirements
+## 🔗 LayerZero Wiring
 
-1. **ERC20 Token Access**: The deployer must ensure that the ERC20 token contract allows the MintBurnOFTAdapter to access its mint and burn methods. This typically requires configuring the ERC20 token's access control mechanisms to include the adapter's address in an allowlist.
+### Wire Configuration
 
-2. **Adapter Deployment and Configuration**:
-   Deploy the MintBurnOFTAdapter with references to the ERC20 token, the LayerZero endpoint, and any relevant delegate addresses.
-   Add the address of the newly deployed MintBurnOFTAdapter to the ERC20 token's allowlist to enable minting and burning.
+After deployment, configure LayerZero connections between networks:
 
-## MintBurnOFTAdapter
+```bash
+# Wire testnet contracts
+MARKET_PAIR=WETH_USDC_SG npx hardhat lz:oapp:wire --oapp-config layerzero.testnet.config.ts
 
-[`MyMintBurnOFTAdapter`](./contracts/MyMintBurnOFTAdapter.sol) is a variant of OFT Adapter that can use a token's external permissions to **burn** on chain A (source chain), as opposed to **lock**, and mint on chain B (destination chain).
+# Wire mainnet contracts
+MARKET_PAIR=WETH_USDC npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+```
 
-## Requirement
+**Network Filtering**: Just like deployments, wiring only occurs between networks configured in the market pair's `hubNetwork` and `expansionNetworks`. Networks not configured for the selected market pair are automatically excluded from the wire configuration.
 
-The only requirement is that the base ERC20 must have an external or public `burn` and a `mint` function, and implement the `IMintableBurnable.sol` interface found in `./devtools/packages/oft-evm/interfaces/IMintableBurnable.sol`.
+### Wire Configuration Files
 
-## Contracts Structure
+- **`layerzero.testnet.config.ts`**: Testnet wiring configuration
+- **`layerzero.mainnet.config.ts`**: Mainnet wiring configuration
 
-### `MinterBurner`
+These files use the wire generator to automatically:
+- Create pathways between hub and expansion networks
+- Set appropriate enforced options (hub vs spoke)
+- Configure DVNs and block confirmations
+- Handle ownership transfers
 
-This is a periphery contract for minting or burning tokens and executing arbitrary calls on the underlying ERC20.
+### Wire Generator Features
 
-### `MintBurnOFTAdapter.sol`
+The wire generator (`devtools/wire/wire-generator.ts`) automatically:
 
-#### Variables
+1. **Determines Contract Types**: Adapter for hub networks, OFT for expansion networks
+2. **Sets Enforced Options**: Different gas limits for hub vs spoke communications
+3. **Creates Full Mesh**: Connects all networks in the expansion list
+4. **Validates Configuration**: Ensures hub networks aren't in expansion lists (throws error if found)
+5. **Network Filtering**: Only wires networks configured in the market pair (hub + expansion networks)
 
-This is the actual OFT Adapter contract that maintains two constants: `innerToken` and `minterBurner`
+## ✅ Validation
 
-- `innerToken`: underlying ERC20 implementation
-- `minterBurner`: reference to the `IMintableBurnable` implementation that has the implementation of `burn` and `mint` functions
+### Configuration Validation
 
-#### Functions
+**⚠️ Always run validation before deployments!** This ensures your configuration matches the actual on-chain token data.
 
-- `_debit`: Calls `burn` on `minterBurner` effectively burning tokens from sender's balance from source chain.
-- `_credit`: Calls `mint` on `minterBurner`, effectively minting tokens to sender's balance on destination chain.
+```bash
+# Validate all GLV tokens (REQUIRED before deployment)
+MARKET_PAIR=WETH_USDC npx hardhat validate-config
 
-> [!IMPORTANT]
-> The default `OFTAdapter` implementation assumes **lossless** transfers, ie. 1 token in = 1 token out. If the underlying ERC20 applies something like a transfer fee, the default will **not** work. A pre/post balance check will need to be added to calculate the `amountReceivedLD`.
+# Validate on specific network
+MARKET_PAIR=WETH_USDC npx hardhat validate-config --network arbitrum-mainnet
+```
+
+### Validation Features
+
+- **Token Name/Symbol Verification**: Compares config vs on-chain data
+- **GLV Focus**: Only validates GLV tokens (GM mismatches expected)
+- **Decimals Display**: Shows token decimals
+- **Network Detection**: Automatically connects to hub networks
+- **Table Output**: Clean, formatted results
+
+### Example Validation Output
+
+```
+📊 Configuration Validation Results
+┌──────────────┬────────────────────────────────────────────┬────────────────────────────────────────┬───────┬────────────────────┬────────────────────┬────────┬──────────┐
+│ Market Pair  │ Contract Address                           │ On-Chain Name                          │ Name  │ Config Symbol      │ On-Chain Symbol    │ Symbol │ Decimals │
+├──────────────┼────────────────────────────────────────────┼────────────────────────────────────────┼───────┼────────────────────┼────────────────────┼────────┼──────────┤
+│ WETH_USDC    │ 0x528A5bac7E746C9A509A1f4F6dF58A03d44279F9 │ GMX Liquidity Vault [WETH-USDC]        │ ✅    │ GLV [WETH-USDC]    │ GLV [WETH-USDC]    │ ✅     │ 18       │
+│ WBTC_USDC    │ 0xdF03EEd325b82bC1d4Db8b49c30ecc9E05104b96 │ GMX Liquidity Vault [WBTC-USDC]        │ ✅    │ GLV [WBTC-USDC]    │ GLV [WBTC-USDC]    │ ✅     │ 18       │
+└──────────────┴────────────────────────────────────────────┴────────────────────────────────────────┴───────┴────────────────────┴────────────────────┴────────┴──────────┘
+
+📋 Summary:
+   GLV tokens validated: 2
+   GLV mismatches: 0
+   ✅ All GLV tokens match their on-chain counterparts!
+```
+
+## 📁 Project Structure
+
+```
+├── devtools/                    # 🛠️ Development utilities
+│   ├── config/                  # 📊 Configuration data
+│   │   ├── networks.ts          # Network settings (confirmations, ownership)
+│   │   ├── tokens.ts            # Token configurations (market pairs)
+│   │   ├── layerzero.ts         # LayerZero settings (enforced options, DVNs)
+│   │   └── index.ts             # Config exports
+│   ├── deploy/                  # 🚀 Deployment utilities
+│   │   ├── utils.ts             # Deploy helper functions
+│   │   └── index.ts
+│   ├── wire/                    # 🔗 LayerZero wire generation
+│   │   ├── wire-generator.ts    # Wire configuration generator
+│   │   ├── config.ts            # Wire-specific configs
+│   │   └── index.ts
+│   ├── types.ts                 # 📋 TypeScript interfaces
+│   └── index.ts                 # Main devtools export
+├── deploy/                      # 📦 Hardhat deployment scripts
+│   ├── GlvToken.ts              # GLV token deployment
+│   └── MarketToken.ts           # GM token deployment
+├── tasks/                       # ⚙️ Custom Hardhat tasks
+│   └── validate-config.ts       # Configuration validation task
+├── layerzero.testnet.config.ts  # 🔗 Testnet LayerZero wiring
+├── layerzero.mainnet.config.ts  # 🔗 Mainnet LayerZero wiring
+└── hardhat.config.ts            # ⚙️ Hardhat configuration
+```
+
+## 🔧 Advanced Usage
+
+### Adding New Market Pairs
+
+1. Add configuration to `devtools/config/tokens.ts`:
+
+```typescript
+const NEW_PAIR: MarketPairConfig = {
+    GM: {
+        tokenName: 'GM NEW-PAIR',
+        tokenSymbol: 'GM NEW-PAIR',
+        hubNetwork: {
+            eid: EndpointId.ARBITRUM_V2_MAINNET,
+            contractAddress: '0x...',
+        },
+        expansionNetworks: ExpansionNetworks.mainnet,
+    },
+    GLV: {
+        tokenName: 'GMX Liquidity Vault [NEW-PAIR]',
+        tokenSymbol: 'GLV [NEW-PAIR]',
+        hubNetwork: {
+            eid: EndpointId.ARBITRUM_V2_MAINNET,
+            contractAddress: '0x...',
+        },
+        expansionNetworks: ExpansionNetworks.mainnet,
+    },
+}
+
+export const Tokens: Config = {
+    // ... existing pairs
+    NEW_PAIR,
+}
+```
+
+2. Deploy with new market pair:
+
+```bash
+MARKET_PAIR=NEW_PAIR npx hardhat lz:deploy
+```
+
+### Adding New Networks
+
+1. Update `devtools/config/networks.ts`:
+
+```typescript
+export const BlockConfirmations: Partial<Record<EndpointId, number>> = {
+    // ... existing networks
+    [EndpointId.NEW_NETWORK]: 10,
+}
+
+export const OwnershipTransfer: Partial<Record<EndpointId, string>> = {
+    // ... existing networks
+    [EndpointId.NEW_NETWORK]: '0x...',
+}
+
+export const ExpansionNetworks = {
+    mainnet: [
+        // ... existing networks
+        EndpointId.NEW_NETWORK,
+    ],
+}
+```
+
+2. Update `hardhat.config.ts`:
+
+```typescript
+networks: {
+    // ... existing networks
+    'new-network': {
+        eid: EndpointId.NEW_NETWORK,
+        url: process.env.RPC_URL_NEW_NETWORK,
+        accounts,
+    },
+}
+```
+
+## 🛠️ Development
+
+### Key Components
+
+- **`devtools/`**: All development utilities and configurations
+- **`deploy/`**: Hardhat deployment scripts for contracts
+- **`tasks/`**: Custom Hardhat tasks for validation and utilities
+- **LayerZero configs**: Wire configuration for cross-chain connectivity
+
+### Deployment Flow
+
+1. **Configuration**: Select market pair via `MARKET_PAIR` env var
+2. **Network Detection**: Automatically determine hub vs expansion networks
+3. **Contract Deployment**: Deploy adapters on hub, OFTs on expansion networks
+4. **Validation**: Verify deployed contracts match configuration
+5. **Wiring**: Configure LayerZero pathways between networks
+
+### Wire Generation
+
+The wire generator automatically:
+- Creates contracts for all configured networks
+- Determines adapter vs OFT based on hub network
+- Sets appropriate enforced options for hub/spoke communication
+- Generates full mesh connectivity between all networks
+
+## 🎯 Common Workflows
+
+### Deploy New Market Pair
+
+```bash
+# 1. Add configuration to devtools/config/tokens.ts
+
+# 2. Validate configuration first
+MARKET_PAIR=NEW_PAIR npx hardhat validate-config
+
+# 3. Deploy contracts
+MARKET_PAIR=NEW_PAIR npx hardhat lz:deploy
+
+# 4. Wire LayerZero connections
+MARKET_PAIR=NEW_PAIR npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+```
+
+### Update Existing Configuration
+
+```bash
+# 1. Update devtools/config/tokens.ts
+
+# 2. Validate changes first
+MARKET_PAIR=UPDATED_PAIR npx hardhat validate-config
+
+# 3. Redeploy if needed
+MARKET_PAIR=UPDATED_PAIR npx hardhat lz:deploy
+```
+
+### Add New Network
+
+```bash
+# 1. Update devtools/config/networks.ts
+# 2. Update hardhat.config.ts
+# 3. Deploy to new network
+MARKET_PAIR=WETH_USDC npx hardhat deploy --network new-network
+
+# 4. Update wire configuration
+MARKET_PAIR=WETH_USDC npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Missing MARKET_PAIR**: Set the environment variable or see available options
+2. **Network Not Configured**: Check if network is in expansion networks list
+3. **Validation Failures**: Verify on-chain token data matches configuration
+4. **Hub in Expansion Networks**: Hub network EID found in expansion networks (validation error)
+5. **Wire Conflicts**: Ensure hub networks aren't in expansion network lists
+
+### Validation Error Example
+
+```bash
+❌ Configuration validation failed:
+   GLV hub network (EID: 30110) should not be in GLV expansion networks
+Error: Hub networks found in expansion networks. This is not allowed.
+```
+
+**Fix**: Remove the hub network EID from the expansion networks array in your token configuration.
+
+### Debug Commands
+
+```bash
+# Check available market pairs
+npx hardhat deploy
+
+# Validate configuration
+npx hardhat validate-config
+
+# Check network connectivity
+npx hardhat node --network arbitrum-mainnet
+```
+
+## 📚 API Reference
+
+### Key Functions
+
+- **`getDeployConfig()`**: Gets market pair configuration from environment
+- **`generateWireConfig()`**: Creates LayerZero wire configuration
+- **`validateHubNetworksNotInExpansion()`**: Validates configuration integrity
+- **`shouldDeployToNetwork()`**: Determines if network should be deployed to
+
+### Configuration Types
+
+- **`MarketPairConfig`**: Complete market pair with GM and GLV tokens
+- **`TokenConfig`**: Individual token configuration
+- **`HubNetwork`**: Hub network with EID and contract address
+- **`DeployConfig`**: Runtime deployment configuration
+
+## 🤝 Contributing
+
+1. Follow the established patterns in `devtools/`
+2. Add proper TypeScript types for new features
+3. Update this README for new functionality
+4. Test deployments on testnet before mainnet
+
+## 📄 License
+
+[Add your license information here]

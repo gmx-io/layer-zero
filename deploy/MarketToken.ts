@@ -4,73 +4,85 @@ import { type DeployFunction, DeployResult } from 'hardhat-deploy/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
+import { getContractAddress, getDeployConfig, isHubNetwork, logNetworkInfo, shouldDeployToNetwork } from '../devtools'
+
 const contractName = 'MarketToken'
 
 const adapterContractName = 'MarketToken_Adapter'
 const oftContractName = 'MarketToken_OFT'
 
-const tokenName = 'GMX Market'
-const tokenSymbol = 'GM'
-
 const deploy: DeployFunction = async (hre) => {
     const { getNamedAccounts, deployments } = hre
 
     const { deploy } = deployments
-    const { deployer } = await getNamedAccounts()
+    const { deployerGM } = await getNamedAccounts()
+    const deployer = deployerGM
 
     assert(deployer, 'Missing named deployer account')
 
-    console.log(`Network: ${hre.network.name}`)
-    console.log(`Deployer: ${deployer}`)
+    // Get market pair configuration (cached after first call)
+    const { marketPairKey, marketPairConfig } = await getDeployConfig()
+    const gmConfig = marketPairConfig.GM
+
+    const eid = hre.network.config.eid as EndpointId
+    const networkName = hre.network.name
+
+    // Skip deployment if this network is not configured for this market pair
+    if (!shouldDeployToNetwork(marketPairConfig, eid)) {
+        console.log(`⏭️  Skipping GM deployment on ${networkName} - not configured for ${marketPairKey}`)
+        return
+    }
+
+    // Log network info for this deployment
+    await logNetworkInfo(hre, networkName, deployer, eid)
 
     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
-
-    const eid = hre.network.config.eid
-    const networkName = hre.network.name
 
     let deployingContractName = oftContractName
     let oftDeployment: DeployResult
 
-    if (eid === EndpointId.ARBSEP_V2_TESTNET || eid === EndpointId.ARBITRUM_V2_MAINNET) {
+    // Check if we're on the hub network - if so, deploy adapter, otherwise deploy OFT
+    if (isHubNetwork(marketPairConfig, 'GM', eid)) {
         deployingContractName = adapterContractName
 
-        const gmTokenAddress = hre.network.config.oftAdapter?.gmTokenAddress
-        if (!gmTokenAddress) {
-            console.warn(`oftAdapter not configured on network config, skipping GM Adapter deployment`)
+        try {
+            const gmTokenAddress = getContractAddress(marketPairConfig, 'GM', eid)
+
+            console.log(`Deploying ${adapterContractName} for ${marketPairKey}`)
+            oftDeployment = await deploy(`${adapterContractName}_${marketPairKey}`, {
+                from: deployer,
+                args: [
+                    gmTokenAddress, // token address
+                    endpointV2Deployment.address,
+                    deployer, // owner
+                ],
+                log: true,
+                skipIfAlreadyDeployed: true,
+                contract: adapterContractName,
+            })
+        } catch (error) {
+            console.error(`❌ ${error instanceof Error ? error.message : String(error)}`)
             return
         }
-
-        console.log(
-            `Deploying ${adapterContractName} lockbox adapter on ${networkName} with innerToken address: ${gmTokenAddress}`
-        )
-        oftDeployment = await deploy(adapterContractName, {
-            from: deployer,
-            args: [
-                gmTokenAddress, // token address
-                endpointV2Deployment.address,
-                deployer, // owner
-            ],
-            log: true,
-            skipIfAlreadyDeployed: true,
-        })
     } else {
-        console.log(`Deploying ${oftContractName} OFT with token name: ${tokenName} and symbol: ${tokenSymbol}`)
+        console.log(`Deploying ${oftContractName} for ${marketPairKey}`)
 
-        oftDeployment = await deploy(oftContractName, {
+        oftDeployment = await deploy(`${oftContractName}_${marketPairKey}`, {
             from: deployer,
             args: [
-                tokenName,
-                tokenSymbol,
+                gmConfig.tokenName,
+                gmConfig.tokenSymbol,
                 endpointV2Deployment.address,
                 deployer, // owner
             ],
             log: true,
             skipIfAlreadyDeployed: true,
+            contract: oftContractName,
         })
     }
 
     console.log(
-        `Deployed contract: ${deployingContractName}, network: ${networkName}, address: ${oftDeployment.address}`
+        `Deployed contract: ${deployingContractName}, network: ${networkName}, address: ${oftDeployment.address}\n`
     )
 }
 

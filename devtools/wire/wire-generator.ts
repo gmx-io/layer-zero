@@ -36,6 +36,7 @@ function getEnforcedOptions(
     const isAHub = contractA.eid === hubEid
     const isBHub = contractB.eid === hubEid
 
+    /// TODO: If we have Eid based overrides, they can be implemented here
     if (isAHub && !isBHub) {
         // A is hub, B is spoke: [spoke-to-hub, hub-to-spoke]
         return [EVM_ENFORCED_OPTIONS_TO_SPOKE, EVM_ENFORCED_OPTIONS_TO_HUB]
@@ -51,6 +52,7 @@ function getEnforcedOptions(
 /**
  * Creates pathways between all contract pairs
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createPathways(contractsToWire: OmniPointHardhat[], dvns: any[], hubEid: number): TwoWayConfig[] {
     const pathways: TwoWayConfig[] = []
 
@@ -59,6 +61,8 @@ function createPathways(contractsToWire: OmniPointHardhat[], dvns: any[], hubEid
             if (i < j) {
                 const enforcedOptions = getEnforcedOptions(contractA, contractB, hubEid)
 
+                /// Right now we assume that the dvns are the same for all pathways
+                /// In the event that they are not, overrides need to be implemented
                 pathways.push([
                     contractA,
                     contractB,

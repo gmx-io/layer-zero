@@ -1,11 +1,10 @@
-import { generateWireConfig } from './devtools'
+import { DVNConfigs, generateWireConfig } from './devtools'
 
 export default async function () {
-    const DVNs = [[], [['P2P', 'Horizen', 'Canary'], 2]] // [[requiredDVNs], [[optionalDVNs], <minRequired>]]
-
     // Generate wire configs for both token types
-    const glvWireConfig = await generateWireConfig('GlvToken', DVNs)
-    const gmWireConfig = await generateWireConfig('MarketToken', DVNs)
+    /// Using default mainnet dvns
+    const glvWireConfig = await generateWireConfig('GlvToken', DVNConfigs.mainnet)
+    const gmWireConfig = await generateWireConfig('MarketToken', DVNConfigs.mainnet)
 
     // Combine contracts and connections
     return {

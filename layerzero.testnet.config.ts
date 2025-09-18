@@ -1,11 +1,10 @@
-import { generateWireConfig } from './devtools'
+import { DVNConfigs, generateWireConfig } from './devtools'
 
 export default async function () {
-    const DVNs = [['LayerZero Labs'], []] // [[requiredDVNs], [[optionalDVNs], <minRequired>]]
-
     // Generate wire configs for both token types
-    const glvWireConfig = await generateWireConfig('GlvToken', DVNs)
-    const gmWireConfig = await generateWireConfig('MarketToken', DVNs)
+    /// Using default testnet dvns
+    const glvWireConfig = await generateWireConfig('GlvToken', DVNConfigs.testnet)
+    const gmWireConfig = await generateWireConfig('MarketToken', DVNConfigs.testnet)
 
     // Combine contracts and connections
     return {

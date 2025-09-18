@@ -13,22 +13,16 @@ import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-import './type-extensions'
+import './tasks/validate-config'
 
-// Set your preferred authentication method
-//
-// If you prefer using a mnemonic, set a MNEMONIC environment variable
-// to a valid mnemonic
-const MNEMONIC = process.env.MNEMONIC
+// Specific deployer keys for GM and GLV
+const PRIVATE_KEY_GM_DEPLOYER = process.env.PRIVATE_KEY_GM_DEPLOYER
+const PRIVATE_KEY_GLV_DEPLOYER = process.env.PRIVATE_KEY_GLV_DEPLOYER
 
-// If you prefer to be authenticated using a private key, set a PRIVATE_KEY environment variable
-const PRIVATE_KEY = process.env.PRIVATE_KEY
-
-const accounts: HttpNetworkAccountsUserConfig | undefined = MNEMONIC
-    ? { mnemonic: MNEMONIC }
-    : PRIVATE_KEY
-      ? [PRIVATE_KEY]
-      : undefined
+const accounts: HttpNetworkAccountsUserConfig | undefined =
+    PRIVATE_KEY_GM_DEPLOYER && PRIVATE_KEY_GLV_DEPLOYER
+        ? [PRIVATE_KEY_GM_DEPLOYER, PRIVATE_KEY_GLV_DEPLOYER]
+        : undefined
 
 if (accounts == null) {
     console.warn(
@@ -54,6 +48,36 @@ const config: HardhatUserConfig = {
         ],
     },
     networks: {
+        'arbitrum-mainnet': {
+            eid: EndpointId.ARBITRUM_V2_MAINNET,
+            url: process.env.RPC_URL_ARBITRUM_MAINNET || 'https://arbitrum.gateway.tenderly.co',
+            accounts,
+        },
+        'base-mainnet': {
+            eid: EndpointId.BASE_V2_MAINNET,
+            url: process.env.RPC_URL_BASE_MAINNET || 'https://base.gateway.tenderly.co',
+            accounts,
+        },
+        'bera-mainnet': {
+            eid: EndpointId.BERA_V2_MAINNET,
+            url: process.env.RPC_URL_BERA_MAINNET || 'https://rpc.berachain.com',
+            accounts,
+        },
+        'botanix-mainnet': {
+            eid: EndpointId.BOTANIX_V2_MAINNET,
+            url: process.env.RPC_URL_BOTANIX_MAINNET || 'https://rpc.botanixlabs.com',
+            accounts,
+        },
+        'bsc-mainnet': {
+            eid: EndpointId.BSC_V2_MAINNET,
+            url: process.env.RPC_URL_BSC_MAINNET || 'https://bsc.drpc.org',
+            accounts,
+        },
+        'ethereum-mainnet': {
+            eid: EndpointId.ETHEREUM_V2_MAINNET,
+            url: process.env.RPC_URL_ETHEREUM_MAINNET || 'https://mainnet.gateway.tenderly.co',
+            accounts,
+        },
         'sepolia-testnet': {
             eid: EndpointId.SEPOLIA_V2_TESTNET,
             url: process.env.RPC_URL_ETHEREUM_TESTNET || 'https://rpc.sepolia.org/',
@@ -63,10 +87,6 @@ const config: HardhatUserConfig = {
             eid: EndpointId.ARBSEP_V2_TESTNET,
             url: process.env.RPC_URL_ARBITRUM_TESTNET || 'https://sepolia-rollup.arbitrum.io/rpc',
             accounts,
-            oftAdapter: {
-                gmTokenAddress: '0xb6fC4C9eB02C35A134044526C62bb15014Ac0Bcc',
-                glvTokenAddress: '0xAb3567e55c205c62B141967145F37b7695a9F854',
-            },
         },
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit
@@ -74,8 +94,11 @@ const config: HardhatUserConfig = {
         },
     },
     namedAccounts: {
-        deployer: {
-            default: 0, // wallet address of index[0], of the mnemonic in .env
+        deployerGM: {
+            default: 0, // GM deployer (first in accounts array)
+        },
+        deployerGLV: {
+            default: 1, // GLV deployer (second in accounts array)
         },
     },
 }

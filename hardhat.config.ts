@@ -50,32 +50,32 @@ const config: HardhatUserConfig = {
     networks: {
         'arbitrum-mainnet': {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
-            url: process.env.RPC_URL_ARBITRUM_MAINNET,
+            url: process.env.RPC_URL_ARBITRUM_MAINNET || 'https://arbitrum.gateway.tenderly.co',
             accounts,
         },
         'base-mainnet': {
             eid: EndpointId.BASE_V2_MAINNET,
-            url: process.env.RPC_URL_BASE_MAINNET,
+            url: process.env.RPC_URL_BASE_MAINNET || 'https://base.gateway.tenderly.co',
             accounts,
         },
         'bera-mainnet': {
             eid: EndpointId.BERA_V2_MAINNET,
-            url: process.env.RPC_URL_BERA_MAINNET,
+            url: process.env.RPC_URL_BERA_MAINNET || 'https://rpc.berachain.com',
             accounts,
         },
         'botanix-mainnet': {
             eid: EndpointId.BOTANIX_V2_MAINNET,
-            url: process.env.RPC_URL_BOTANIX_MAINNET,
+            url: process.env.RPC_URL_BOTANIX_MAINNET || 'https://rpc.botanixlabs.com',
             accounts,
         },
         'bsc-mainnet': {
             eid: EndpointId.BSC_V2_MAINNET,
-            url: process.env.RPC_URL_BSC_MAINNET,
+            url: process.env.RPC_URL_BSC_MAINNET || 'https://bsc.drpc.org',
             accounts,
         },
         'ethereum-mainnet': {
             eid: EndpointId.ETHEREUM_V2_MAINNET,
-            url: process.env.RPC_URL_ETHEREUM_MAINNET,
+            url: process.env.RPC_URL_ETHEREUM_MAINNET || 'https://mainnet.gateway.tenderly.co',
             accounts,
         },
         'sepolia-testnet': {

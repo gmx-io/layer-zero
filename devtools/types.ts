@@ -13,7 +13,6 @@ export interface HubNetwork {
  * Token configuration for a single token (GM or GLV)
  */
 export interface TokenConfig {
-    tokenName: string
     tokenSymbol: string
     hubNetwork: HubNetwork
     expansionNetworks: EndpointId[]

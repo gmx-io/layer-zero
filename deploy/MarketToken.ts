@@ -4,7 +4,14 @@ import { type DeployFunction, DeployResult } from 'hardhat-deploy/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-import { getContractAddress, getDeployConfig, isHubNetwork, logNetworkInfo, shouldDeployToNetwork } from '../devtools'
+import {
+    GM_TOKEN_NAME,
+    getContractAddress,
+    getDeployConfig,
+    isHubNetwork,
+    logNetworkInfo,
+    shouldDeployToNetwork,
+} from '../devtools'
 
 const contractName = 'MarketToken'
 
@@ -70,7 +77,7 @@ const deploy: DeployFunction = async (hre) => {
         oftDeployment = await deploy(`${oftContractName}_${marketPairKey}`, {
             from: deployer,
             args: [
-                gmConfig.tokenName,
+                GM_TOKEN_NAME,
                 gmConfig.tokenSymbol,
                 endpointV2Deployment.address,
                 deployer, // owner

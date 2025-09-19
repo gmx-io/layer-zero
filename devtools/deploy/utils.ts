@@ -30,7 +30,7 @@ export async function getDeployConfig(): Promise<DeployConfig> {
     const maxKeyLength = Math.max(...availableKeys.map((key) => key.length))
 
     availableKeys.forEach((key) => {
-        console.log(`   MARKET_PAIR=${key.padEnd(maxKeyLength)}  # ${Tokens[key].GLV.tokenName}`)
+        console.log(`   MARKET_PAIR=${key.padEnd(maxKeyLength)}  # ${Tokens[key].GLV.tokenSymbol}`)
     })
 
     console.log('\n💡 Usage examples:')

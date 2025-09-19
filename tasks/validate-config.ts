@@ -3,7 +3,7 @@ import { Contract } from 'ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 
-import { TokenConfig, Tokens } from '../devtools'
+import { GLV_TOKEN_NAME, GM_TOKEN_NAME, TokenConfig, Tokens, validateHubNetworksNotInExpansion } from '../devtools'
 
 // ERC20 ABI for getting token info
 const ERC20_ABI = [
@@ -17,12 +17,9 @@ interface ValidationResult {
     tokenType: 'GM' | 'GLV'
     network: string
     contractAddress: string
-    configName: string
     configSymbol: string
-    onChainName: string
     onChainSymbol: string
     decimals: number
-    nameMatch: boolean
     symbolMatch: boolean
 }
 
@@ -48,23 +45,16 @@ async function validateTokenConfig(
             const newProvider = new hre.ethers.providers.JsonRpcProvider(hubNetwork.url)
             const contract = new Contract(tokenConfig.hubNetwork.contractAddress, ERC20_ABI, newProvider)
 
-            const [onChainName, onChainSymbol, decimals] = await Promise.all([
-                contract.name(),
-                contract.symbol(),
-                contract.decimals(),
-            ])
+            const [onChainSymbol, decimals] = await Promise.all([contract.symbol(), contract.decimals()])
 
             return {
                 marketPair,
                 tokenType,
                 network: networkName,
                 contractAddress: tokenConfig.hubNetwork.contractAddress,
-                configName: tokenConfig.tokenName,
                 configSymbol: tokenConfig.tokenSymbol,
-                onChainName,
                 onChainSymbol,
                 decimals,
-                nameMatch: tokenConfig.tokenName === onChainName,
                 symbolMatch: tokenConfig.tokenSymbol === onChainSymbol,
             }
         }
@@ -73,23 +63,16 @@ async function validateTokenConfig(
     // Fallback: use current provider (assuming we're on the correct network)
     const contract = new Contract(tokenConfig.hubNetwork.contractAddress, ERC20_ABI, provider)
 
-    const [onChainName, onChainSymbol, decimals] = await Promise.all([
-        contract.name(),
-        contract.symbol(),
-        contract.decimals(),
-    ])
+    const [onChainSymbol, decimals] = await Promise.all([contract.symbol(), contract.decimals()])
 
     return {
         marketPair,
         tokenType,
         network: networkName,
         contractAddress: tokenConfig.hubNetwork.contractAddress,
-        configName: tokenConfig.tokenName,
         configSymbol: tokenConfig.tokenSymbol,
-        onChainName,
         onChainSymbol,
         decimals,
-        nameMatch: tokenConfig.tokenName === onChainName,
         symbolMatch: tokenConfig.tokenSymbol === onChainSymbol,
     }
 }
@@ -98,17 +81,8 @@ function formatTable(results: ValidationResult[]): void {
     console.log('\n📊 Configuration Validation Results')
 
     const table = new CliTable3.default({
-        head: [
-            'Market Pair',
-            'Contract Address',
-            'On-Chain Name',
-            'Name',
-            'Config Symbol',
-            'On-Chain Symbol',
-            'Symbol',
-            'Decimals',
-        ],
-        colWidths: [16, 44, 40, 7, 20, 20, 8, 10],
+        head: ['Market Pair', 'Contract Address', 'Config Symbol', 'On-Chain Symbol', 'Symbol', 'Decimals'],
+        colWidths: [16, 44, 25, 25, 8, 10],
         wordWrap: true,
         wrapOnWordBoundary: false,
     })
@@ -117,8 +91,6 @@ function formatTable(results: ValidationResult[]): void {
         table.push([
             result.marketPair,
             result.contractAddress,
-            result.onChainName,
-            result.nameMatch ? '✅' : '❌',
             result.configSymbol,
             result.onChainSymbol,
             result.symbolMatch ? '✅' : '❌',
@@ -129,7 +101,7 @@ function formatTable(results: ValidationResult[]): void {
     console.log(table.toString())
 
     // Summary
-    const glvMismatches = results.filter((r) => !r.nameMatch || !r.symbolMatch)
+    const glvMismatches = results.filter((r) => !r.symbolMatch)
 
     console.log('\n📋 Summary:')
     console.log(`   GLV tokens validated: ${results.length}`)
@@ -139,12 +111,7 @@ function formatTable(results: ValidationResult[]): void {
         console.log('\n⚠️  GLV Token Mismatches (these need attention):')
         glvMismatches.forEach((result) => {
             console.log(`   ${result.marketPair} GLV:`)
-            if (!result.nameMatch) {
-                console.log(`     Name: "${result.configName}" ≠ "${result.onChainName}"`)
-            }
-            if (!result.symbolMatch) {
-                console.log(`     Symbol: "${result.configSymbol}" ≠ "${result.onChainSymbol}"`)
-            }
+            console.log(`     Symbol: "${result.configSymbol}" ≠ "${result.onChainSymbol}"`)
         })
     } else {
         console.log('   ✅ All GLV tokens match their on-chain counterparts!')
@@ -155,6 +122,19 @@ task('validate-config', 'Validates the devtools configuration against on-chain t
     async (taskArgs, hre: HardhatRuntimeEnvironment) => {
         console.log('Starting configuration validation...\n')
 
+        // First, validate that hub networks are not in expansion networks
+        console.log('🔍 Validating configuration structure...')
+        for (const [marketPairKey, marketPairConfig] of Object.entries(Tokens)) {
+            try {
+                validateHubNetworksNotInExpansion(marketPairConfig)
+                console.log(`✅ ${marketPairKey}: Configuration structure valid`)
+            } catch (error) {
+                console.error(`❌ ${marketPairKey}: ${error instanceof Error ? error.message : String(error)}`)
+                return
+            }
+        }
+
+        console.log('\n🔍 Validating on-chain token data...')
         const results: ValidationResult[] = []
 
         // Process each market pair in the config

@@ -4,7 +4,14 @@ import { type DeployFunction, DeployResult } from 'hardhat-deploy/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-import { getContractAddress, getDeployConfig, isHubNetwork, logNetworkInfo, shouldDeployToNetwork } from '../devtools'
+import {
+    GLV_TOKEN_NAME,
+    getContractAddress,
+    getDeployConfig,
+    isHubNetwork,
+    logNetworkInfo,
+    shouldDeployToNetwork,
+} from '../devtools'
 
 const contractName = 'GlvToken' // This is the main contract name for the GLV token
 
@@ -70,7 +77,7 @@ const deploy: DeployFunction = async (hre) => {
         oftDeployment = await deploy(`${oftContractName}_${marketPairKey}`, {
             from: deployer,
             args: [
-                glvConfig.tokenName,
+                GLV_TOKEN_NAME,
                 glvConfig.tokenSymbol,
                 endpointV2Deployment.address, // LayerZero's EndpointV2 address
                 deployer, // owner

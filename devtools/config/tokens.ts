@@ -5,12 +5,17 @@ import { ExpansionNetworks } from './networks'
 import type { Config, MarketPairConfig } from '../types'
 
 /**
+ * Standard token names
+ */
+export const GM_TOKEN_NAME = 'GMX Market'
+export const GLV_TOKEN_NAME = 'GMX Liquidity Vault'
+
+/**
  * Market pair configurations
  */
 const WETH_USDC: MarketPairConfig = {
     GM: {
-        tokenName: 'GM WETH-USDC',
-        tokenSymbol: 'GM WETH-USDC',
+        tokenSymbol: 'GM: ETH/USD [WETH-USDC]',
         hubNetwork: {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
             contractAddress: '0x70d95587d40a2caf56bd97485ab3eec10bee6336',
@@ -18,7 +23,6 @@ const WETH_USDC: MarketPairConfig = {
         expansionNetworks: ExpansionNetworks.mainnet,
     },
     GLV: {
-        tokenName: 'GMX Liquidity Vault [WETH-USDC]',
         tokenSymbol: 'GLV [WETH-USDC]',
         hubNetwork: {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
@@ -30,8 +34,7 @@ const WETH_USDC: MarketPairConfig = {
 
 const WBTC_USDC: MarketPairConfig = {
     GM: {
-        tokenName: 'GM WBTC-USDC',
-        tokenSymbol: 'GM WBTC-USDC',
+        tokenSymbol: 'GM: BTC/USD [WBTC-USDC]',
         hubNetwork: {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
             contractAddress: '0x47c031236e19d024b42f8ae6780e44a573170703',
@@ -39,7 +42,6 @@ const WBTC_USDC: MarketPairConfig = {
         expansionNetworks: ExpansionNetworks.mainnet,
     },
     GLV: {
-        tokenName: 'GMX Liquidity Vault [WBTC-USDC]',
         tokenSymbol: 'GLV [WBTC-USDC]',
         hubNetwork: {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
@@ -51,7 +53,6 @@ const WBTC_USDC: MarketPairConfig = {
 
 const WETH_USDC_SG: MarketPairConfig = {
     GM: {
-        tokenName: 'GM WETH-USDC.SG',
         tokenSymbol: 'GM WETH-USDC.SG',
         hubNetwork: {
             eid: EndpointId.ARBSEP_V2_TESTNET,
@@ -60,7 +61,6 @@ const WETH_USDC_SG: MarketPairConfig = {
         expansionNetworks: ExpansionNetworks.testnet,
     },
     GLV: {
-        tokenName: 'GMX Liquidity Vault [WETH-USDC.SG]',
         tokenSymbol: 'GLV [WETH-USDC.SG]',
         hubNetwork: {
             eid: EndpointId.ARBSEP_V2_TESTNET,

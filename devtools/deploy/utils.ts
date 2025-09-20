@@ -34,8 +34,8 @@ export async function getDeployConfig(): Promise<DeployConfig> {
     })
 
     console.log('\n💡 Usage examples:')
-    console.log(`   MARKET_PAIR=${'WETH_USDC'.padEnd(maxKeyLength)} npx hardhat lz:deploy`)
-    console.log(`   MARKET_PAIR=${'WBTC_USDC'.padEnd(maxKeyLength)} npx hardhat deploy --network arbitrum-mainnet`)
+    console.log(`   npx hardhat lz:sdk:deploy::mainnet --market-pair ${'WETH_USDC'.padEnd(maxKeyLength)}`)
+    console.log(`   npx hardhat lz:sdk:wire --market-pair ${'WBTC_USDC'.padEnd(maxKeyLength)}`)
     console.log('')
 
     process.exit(1)

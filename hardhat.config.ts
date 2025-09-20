@@ -13,7 +13,7 @@ import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-import './tasks/validate-config'
+import './tasks'
 
 // Specific deployer keys for GM and GLV
 const PRIVATE_KEY_GM_DEPLOYER = process.env.PRIVATE_KEY_GM_DEPLOYER

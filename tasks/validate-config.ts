@@ -3,7 +3,7 @@ import { Contract } from 'ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 
-import { GLV_TOKEN_NAME, GM_TOKEN_NAME, TokenConfig, Tokens, validateHubNetworksNotInExpansion } from '../devtools'
+import { TokenConfig, Tokens, validateHubNetworksNotInExpansion } from '../devtools'
 
 // ERC20 ABI for getting token info
 const ERC20_ABI = [
@@ -78,7 +78,7 @@ async function validateTokenConfig(
 }
 
 function formatTable(results: ValidationResult[]): void {
-    console.log('\n📊 Configuration Validation Results')
+    console.log('\nConfiguration Validation Results')
 
     const table = new CliTable3.default({
         head: ['Market Pair', 'Contract Address', 'Config Symbol', 'On-Chain Symbol', 'Symbol', 'Decimals'],
@@ -103,7 +103,7 @@ function formatTable(results: ValidationResult[]): void {
     // Summary
     const glvMismatches = results.filter((r) => !r.symbolMatch)
 
-    console.log('\n📋 Summary:')
+    console.log('\nSummary:')
     console.log(`   GLV tokens validated: ${results.length}`)
     console.log(`   GLV mismatches: ${glvMismatches.length}`)
 
@@ -118,7 +118,7 @@ function formatTable(results: ValidationResult[]): void {
     }
 }
 
-task('validate-config', 'Validates the devtools configuration against on-chain token data').setAction(
+task('lz:sdk:validate-config', 'Validates the devtools configuration against on-chain token data').setAction(
     async (taskArgs, hre: HardhatRuntimeEnvironment) => {
         console.log('Starting configuration validation...\n')
 
@@ -159,3 +159,5 @@ task('validate-config', 'Validates the devtools configuration against on-chain t
         formatTable(results)
     }
 )
+
+export { validateTokenConfig, formatTable }

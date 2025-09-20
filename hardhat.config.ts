@@ -13,7 +13,7 @@ import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
-import './tasks/validate-config'
+import './tasks'
 
 // Specific deployer keys for GM and GLV
 const PRIVATE_KEY_GM_DEPLOYER = process.env.PRIVATE_KEY_GM_DEPLOYER
@@ -23,6 +23,8 @@ const accounts: HttpNetworkAccountsUserConfig | undefined =
     PRIVATE_KEY_GM_DEPLOYER && PRIVATE_KEY_GLV_DEPLOYER
         ? [PRIVATE_KEY_GM_DEPLOYER, PRIVATE_KEY_GLV_DEPLOYER]
         : undefined
+
+const hardhatAccounts = accounts?.map((key) => ({ privateKey: key, balance: '10000000000000000000000' }))
 
 if (accounts == null) {
     console.warn(
@@ -91,6 +93,7 @@ const config: HardhatUserConfig = {
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit
             allowUnlimitedContractSize: true,
+            accounts: hardhatAccounts,
         },
     },
     namedAccounts: {

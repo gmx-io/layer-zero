@@ -5,8 +5,6 @@ coverage.json
 typechain
 typechain-types
 
-standard-input-jsons/
-
 # Hardhat files
 cache
 artifacts

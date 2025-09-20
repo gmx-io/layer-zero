@@ -15,7 +15,7 @@ import { OFTAdapter } from "@layerzerolabs/oft-evm/contracts/OFTAdapter.sol";
  * IF the 'innerToken' applies something like a transfer fee, the default will NOT work...
  * a pre/post balance check will need to be done to calculate the amountSentLD/amountReceivedLD.
  */
-contract GlvTokenAdapter is OFTAdapter {
+contract GlvToken_Adapter is OFTAdapter {
     constructor(
         address _token,
         address _lzEndpoint,

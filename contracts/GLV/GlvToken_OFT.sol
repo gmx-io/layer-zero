@@ -6,7 +6,7 @@ import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 
 import { OFT } from "@layerzerolabs/oft-evm/contracts/OFT.sol";
 
-contract GlvTokenOFT is OFT, ERC20Permit {
+contract GlvToken_OFT is OFT, ERC20Permit {
     /// @dev Using msg.sender instead of _delegate in Ownable to avoid via-ir
     constructor(
         string memory _name,

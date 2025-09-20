@@ -8,6 +8,7 @@ This project provides a comprehensive deployment and configuration system for GM
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 - [LayerZero Wiring](#layerzero-wiring)
+- [Enhanced Task Commands](#enhanced-task-commands)
 - [Validation](#validation)
 - [Project Structure](#project-structure)
 
@@ -83,52 +84,35 @@ Network settings are defined in `devtools/config/networks.ts`:
 
 ```bash
 # 1. First, validate your configuration
-MARKET_PAIR=WETH_USDC npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
 
-# 2. Then deploy to all configured networks
-MARKET_PAIR=WETH_USDC npx hardhat lz:deploy
+# 2. Deploy all contracts to mainnet networks
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
 
-# Or deploy to specific networks
-MARKET_PAIR=WBTC_USDC npx hardhat deploy --network arbitrum-mainnet --tags GlvToken,MarketToken
+# Or deploy to testnet networks
+npx hardhat lz:sdk:deploy --stage testnet --marketPair WETH_USDC_SG
 ```
 
 ### Available Commands
 
 ```bash
 # Always validate first!
-MARKET_PAIR=WETH_USDC npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
 
-# Deploy all contracts across all networks
-MARKET_PAIR=WETH_USDC npx hardhat lz:deploy
+# Deploy all contracts to mainnet networks
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
 
-# Deploy only GLV tokens
-MARKET_PAIR=WETH_USDC npx hardhat deploy --tags GlvToken
+# Deploy only GM contracts to mainnet
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --tokenType GM
 
-# Deploy only GM tokens  
-MARKET_PAIR=WBTC_USDC npx hardhat deploy --tags MarketToken
+# Deploy only GLV contracts to mainnet  
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WBTC_USDC --tokenType GLV
 
-# Deploy to specific network
-MARKET_PAIR=WETH_USDC_SG npx hardhat deploy --network sepolia-testnet
-```
+# Deploy all contracts to testnet networks
+npx hardhat lz:sdk:deploy --stage testnet --marketPair WETH_USDC_SG
 
-### Without MARKET_PAIR Environment Variable
-
-If you don't set `MARKET_PAIR`, you'll see available options:
-
-```bash
-npx hardhat deploy
-
-# Output:
-❌ No MARKET_PAIR environment variable set.
-
-📋 Available market pairs:
-   MARKET_PAIR=WETH_USDC     # GMX Liquidity Vault [WETH-USDC]
-   MARKET_PAIR=WBTC_USDC     # GMX Liquidity Vault [WBTC-USDC]  
-   MARKET_PAIR=WETH_USDC_SG  # GMX Liquidity Vault [WETH-USDC.SG]
-
-💡 Usage examples:
-   MARKET_PAIR=WETH_USDC     npx hardhat lz:deploy
-   MARKET_PAIR=WBTC_USDC     npx hardhat deploy --network arbitrum-mainnet
+# Deploy with advanced options using the base wrapper
+npx hardhat lz:sdk:deploy --marketPair WETH_USDC --stage mainnet --networks "arbitrum-mainnet,base-mainnet"
 ```
 
 ### Deployment Logic
@@ -177,17 +161,298 @@ Deployed contract: MarketToken_OFT, network: base-mainnet, address: 0x...
 
 ### Wire Configuration
 
-After deployment, configure LayerZero connections between networks:
+After deployment, configure LayerZero connections between networks using the enhanced wrapper tasks:
 
 ```bash
-# Wire testnet contracts
-MARKET_PAIR=WETH_USDC_SG npx hardhat lz:oapp:wire --oapp-config layerzero.testnet.config.ts
+# Wire both GM and GLV contracts for a market pair
+npx hardhat lz:sdk:wire --marketPair WETH_USDC
 
-# Wire mainnet contracts
-MARKET_PAIR=WETH_USDC npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+# Wire only GM contracts
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM
+
+# Wire only GLV contracts
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GLV
+
+# Wire with ownership delegation
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GLV --setDelegate
+
+# Generate transaction payloads for multisig execution
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --generatePayloads
 ```
 
 **Network Filtering**: Just like deployments, wiring only occurs between networks configured in the market pair's `hubNetwork` and `expansionNetworks`. Networks not configured for the selected market pair are automatically excluded from the wire configuration.
+
+### Automatic Features
+
+- **Signer Detection**: Automatically uses the correct deployer (`deployerGM` or `deployerGLV`) from your Hardhat configuration
+- **Config Selection**: Automatically selects the correct LayerZero config file based on token type
+- **Market Pair Handling**: No need to set environment variables - specify everything via CLI flags
+
+## 🔧 Enhanced Task Commands
+
+The project includes enhanced Hardhat tasks that simplify deployment and wiring operations with better logging and streamlined workflows.
+
+### 🚀 Deployment Tasks
+
+#### Deploy (Base Command)
+```bash
+# Deploy with automatic market pair handling
+npx hardhat lz:sdk:deploy --marketPair WETH_USDC --stage mainnet
+
+# Deploy specific token type with tags
+npx hardhat lz:sdk:deploy --marketPair WBTC_USDC --stage mainnet --tags MarketToken
+
+# Deploy to specific networks
+npx hardhat lz:sdk:deploy --marketPair WETH_USDC --networks "arbitrum-mainnet,base-mainnet" --stage mainnet
+
+# Deploy with logging level
+npx hardhat lz:sdk:deploy --marketPair WETH_USDC --stage mainnet --logLevel debug
+```
+
+#### Deploy Examples by Stage
+```bash
+# Deploy all contracts to mainnet networks
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
+
+# Deploy all contracts to testnet networks
+npx hardhat lz:sdk:deploy --stage testnet --marketPair WETH_USDC_SG
+
+# Deploy only GM contracts to mainnet
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --tokenType GM
+
+# Deploy only GLV contracts to testnet
+npx hardhat lz:sdk:deploy --stage testnet --marketPair WETH_USDC_SG --tokenType GLV
+
+# Deploy with reset (delete existing deployments)
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --reset
+
+# Deploy in CI mode (non-interactive)
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --ci
+```
+
+### 🔗 Wiring Tasks
+
+#### Wire (Unified Command)
+```bash
+# Wire both GM and GLV contracts with automatic signer detection
+npx hardhat lz:sdk:wire --marketPair WETH_USDC
+
+# Wire only GM contracts
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM
+
+# Wire only GLV contracts
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GLV
+
+# Wire with custom signer (overrides automatic detection)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --signer 0x1234567890123456789012345678901234567890
+
+# Wire both types with separate signers for GM and GLV
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --gmSigner 0x1111... --glvSigner 0x2222...
+
+# Wire with fallback signer for both types
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --signer 0x3333...
+
+# Wire with ownership delegation
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GLV --setDelegate
+
+# Generate transaction payloads for review (useful for multisig)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --generatePayloads
+
+# Dry run (simulate without executing)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --dryRun
+
+# Wire with custom logging level
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --logLevel verbose
+
+# Wire both with delegation and payload generation
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --setDelegate --generatePayloads
+
+# Wire both in CI mode
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --ci
+```
+
+### 🔐 Ownership Transfer Tasks
+
+#### Transfer Ownership (Unified Command)
+```bash
+# Transfer ownership for both GM and GLV contracts
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC
+
+# Transfer ownership for only GM contracts
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --token-type GM
+
+# Transfer ownership for only GLV contracts
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --token-type GLV
+
+# Transfer ownership with custom signer (overrides automatic detection)
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --token-type GM --signer 0x1234567890123456789012345678901234567890
+
+# Transfer ownership with separate signers for GM and GLV
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --gm-signer 0x1111... --glv-signer 0x2222...
+
+# Transfer ownership using Gnosis Safe
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --safe
+
+# Dry run (simulate without executing)
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --dry-run
+
+# Assert mode (fail if transactions are required)
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --assert
+
+# Transfer ownership in CI mode
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --ci
+
+# Transfer ownership with custom logging level
+npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --log-level verbose
+```
+
+### 📊 Management Tasks
+
+#### Display Deployments
+```bash
+# Show all deployed contracts grouped by market pair
+npx hardhat lz:sdk:display-deployments
+
+# Show only mainnet deployments
+npx hardhat lz:sdk:display-deployments --mainnet
+
+# Show only testnet deployments
+npx hardhat lz:sdk:display-deployments --testnet
+
+# Filter by specific network
+npx hardhat lz:sdk:display-deployments --filterNetworks arbitrum-mainnet
+```
+
+#### Validate Deployments
+```bash
+# Validate all LayerZero deployments by testing quoteSend() calls
+npx hardhat lz:sdk:validate-deployments
+
+# Validate only mainnet deployments
+npx hardhat lz:sdk:validate-deployments --mainnet
+
+# Validate only testnet deployments
+npx hardhat lz:sdk:validate-deployments --testnet
+
+# Validate specific market pair
+npx hardhat lz:sdk:validate-deployments --marketPair WETH_USDC
+
+# Validate specific token type
+npx hardhat lz:sdk:validate-deployments --tokenType GLV
+
+# Validate specific network
+npx hardhat lz:sdk:validate-deployments --filterNetworks arbitrum-mainnet
+```
+
+#### Validate Configuration
+```bash
+# Validate token configuration against on-chain data
+npx hardhat lz:sdk:validate-config
+```
+
+### 🔐 Signer Management
+
+The enhanced tasks automatically detect signers from Hardhat's named accounts configuration. However, you can override this behavior:
+
+#### Automatic Signer Detection
+- **GM contracts**: Uses `deployerGM` from named accounts
+- **GLV contracts**: Uses `deployerGLV` from named accounts
+- **Fallback**: Manual signer specification via `--signer` flag
+
+#### Manual Signer Override
+```bash
+# Use specific signer address (overrides automatic detection)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --signer 0x1234567890123456789012345678901234567890
+```
+
+#### Payload Generation for Multisig
+When generating payloads for multisig execution, the specific private key doesn't matter since transactions aren't executed:
+
+```bash
+# Generate payloads with any valid address (private key not used)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --generatePayloads --signer 0x0000000000000000000000000000000000000001
+
+# Or use automatic detection (will generate payloads but not execute)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --generatePayloads
+
+# Generate payloads for both GM and GLV
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --generatePayloads
+```
+
+**💡 Tip**: For payload generation, you can use any valid Ethereum address as the signer since the private key is not needed for transaction simulation. The generated JSON files contain the transaction data for manual execution or multisig proposals.
+
+### 📝 Task Output Examples
+
+#### Deploy Task Output
+```
+info:    [deploy-wrapper] Deploying contracts for market pair: WETH_USDC
+info:    [deploy-wrapper] Stage: mainnet
+info:    [deploy-wrapper] Tags: MarketToken
+info:    [deploy-wrapper] Executing deploy command...
+info:    [deploy-wrapper] ✅ Deploy command completed successfully!
+```
+
+#### Wire Task Output
+```
+info:    [wire] Wiring all contracts for WETH_USDC
+info:    [wire] Wiring GM contracts for WETH_USDC
+info:    [wire] Config: layerzero.gm.mainnet.config.ts
+info:    [wire] Signer: 0x1234567890123456789012345678901234567890
+info:    [wire] Delegate: Yes
+info:    [wire] Payloads will be saved to: wire-payloads-WETH_USDC-GM-delegated-2024-03-15T10-30-45.json
+info:    [wire] Executing wire command...
+info:    [wire] ✅ Wire command completed successfully!
+info:    [wire] Wiring GLV contracts for WETH_USDC
+info:    [wire] Config: layerzero.glv.mainnet.config.ts
+info:    [wire] Signer: 0x5678901234567890123456789012345678901234
+info:    [wire] Delegate: Yes
+info:    [wire] Executing wire command...
+info:    [wire] ✅ Wire command completed successfully!
+info:    [wire] ✅ All wiring completed successfully!
+```
+
+#### Ownership Transfer Task Output
+```
+info:    [transfer-ownership] Transferring ownership for all contracts for WETH_USDC
+info:    [transfer-ownership] Transferring ownership for GM contracts for WETH_USDC
+info:    [transfer-ownership] Config: layerzero.gm.mainnet.config.ts
+info:    [transfer-ownership] Signer: 0x1234567890123456789012345678901234567890
+info:    [transfer-ownership] Safe: No
+info:    [transfer-ownership] Executing ownership transfer command...
+info:    [transfer-ownership] ✅ Ownership transfer completed successfully!
+info:    [transfer-ownership] Transferring ownership for GLV contracts for WETH_USDC
+info:    [transfer-ownership] Config: layerzero.glv.mainnet.config.ts
+info:    [transfer-ownership] Signer: 0x5678901234567890123456789012345678901234
+info:    [transfer-ownership] Safe: No
+info:    [transfer-ownership] Executing ownership transfer command...
+info:    [transfer-ownership] ✅ Ownership transfer completed successfully!
+info:    [transfer-ownership] ✅ All ownership transfers completed successfully!
+```
+
+#### Display Deployments Output
+```
+Deployed Contracts by Market Pair
+
+1. WETH-USDC
+   GM Tokens:
+     arbitrum-mainnet: 0x1234... (Adapter)
+     base-mainnet: 0x5678... (OFT)
+     bsc-mainnet: 0x9ABC... (OFT)
+   GLV Tokens:
+     arbitrum-mainnet: 0xDEF0... (Adapter)
+     base-mainnet: 0x1357... (OFT)
+     bsc-mainnet: 0x2468... (OFT)
+
+2. WBTC-USDC
+   GM Tokens:
+     arbitrum-mainnet: 0xACE1... (Adapter)
+     base-mainnet: 0xBEEF... (OFT)
+   GLV Tokens:
+     arbitrum-mainnet: 0xCAFE... (Adapter)
+     base-mainnet: 0xDEAD... (OFT)
+
+Summary: 2 market pairs, 8 contracts
+```
 
 ### Wire Configuration Files
 
@@ -218,10 +483,28 @@ The wire generator (`devtools/wire/wire-generator.ts`) automatically:
 
 ```bash
 # Validate all GLV tokens (REQUIRED before deployment)
-MARKET_PAIR=WETH_USDC npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
 
 # Validate on specific network
-MARKET_PAIR=WETH_USDC npx hardhat validate-config --network arbitrum-mainnet
+npx hardhat lz:sdk:validate-config --network arbitrum-mainnet
+```
+
+### Deployment Validation
+
+After deployment, validate that LayerZero wiring is working correctly:
+
+```bash
+# Validate all deployments by testing cross-chain quoteSend() calls
+npx hardhat lz:sdk:validate-deployments
+
+# Validate only mainnet deployments
+npx hardhat lz:sdk:validate-deployments --mainnet
+
+# Validate specific market pair
+npx hardhat lz:sdk:validate-deployments --marketPair WETH_USDC
+
+# Display deployed contracts grouped by market pair
+npx hardhat lz:sdk:display-deployments
 ```
 
 ### Validation Features
@@ -386,13 +669,16 @@ The wire generator automatically:
 # 1. Add configuration to devtools/config/tokens.ts
 
 # 2. Validate configuration first
-MARKET_PAIR=NEW_PAIR npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
 
-# 3. Deploy contracts
-MARKET_PAIR=NEW_PAIR npx hardhat lz:deploy
+# 3. Deploy contracts to mainnet
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair NEW_PAIR
 
 # 4. Wire LayerZero connections
-MARKET_PAIR=NEW_PAIR npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+npx hardhat lz:sdk:wire --marketPair NEW_PAIR
+
+# 5. Validate deployments
+npx hardhat lz:sdk:validate-deployments --marketPair NEW_PAIR
 ```
 
 ### Update Existing Configuration
@@ -401,10 +687,26 @@ MARKET_PAIR=NEW_PAIR npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.co
 # 1. Update devtools/config/tokens.ts
 
 # 2. Validate changes first
-MARKET_PAIR=UPDATED_PAIR npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
 
 # 3. Redeploy if needed
-MARKET_PAIR=UPDATED_PAIR npx hardhat lz:deploy
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair UPDATED_PAIR
+
+# 4. Rewire connections
+npx hardhat lz:sdk:wire --marketPair UPDATED_PAIR
+```
+
+### Deploy Only Specific Token Type
+
+```bash
+# Deploy only GM contracts
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --tokenType GM
+
+# Wire only GM contracts
+npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM
+
+# Validate only GM deployments
+npx hardhat lz:sdk:validate-deployments --marketPair WETH_USDC --tokenType GM
 ```
 
 ### Add New Network
@@ -412,22 +714,23 @@ MARKET_PAIR=UPDATED_PAIR npx hardhat lz:deploy
 ```bash
 # 1. Update devtools/config/networks.ts
 # 2. Update hardhat.config.ts
-# 3. Deploy to new network
-MARKET_PAIR=WETH_USDC npx hardhat deploy --network new-network
+# 3. Deploy to all networks (including new one)
+npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
 
-# 4. Update wire configuration
-MARKET_PAIR=WETH_USDC npx hardhat lz:oapp:wire --oapp-config layerzero.mainnet.config.ts
+# 4. Wire all connections (including new network)
+npx hardhat lz:sdk:wire --marketPair WETH_USDC
 ```
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Missing MARKET_PAIR**: Set the environment variable or see available options
+1. **Missing Market Pair**: Specify `--marketPair` parameter in your command
 2. **Network Not Configured**: Check if network is in expansion networks list
 3. **Validation Failures**: Verify on-chain token data matches configuration
 4. **Hub in Expansion Networks**: Hub network EID found in expansion networks (validation error)
 5. **Wire Conflicts**: Ensure hub networks aren't in expansion network lists
+6. **Signer Not Found**: Ensure `deployerGM` and `deployerGLV` are configured in your Hardhat named accounts
 
 ### Validation Error Example
 
@@ -442,11 +745,14 @@ Error: Hub networks found in expansion networks. This is not allowed.
 ### Debug Commands
 
 ```bash
-# Check available market pairs
-npx hardhat deploy
+# Display all deployed contracts
+npx hardhat lz:sdk:display-deployments
 
 # Validate configuration
-npx hardhat validate-config
+npx hardhat lz:sdk:validate-config
+
+# Validate deployments
+npx hardhat lz:sdk:validate-deployments
 
 # Check network connectivity
 npx hardhat node --network arbitrum-mainnet

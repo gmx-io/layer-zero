@@ -16,13 +16,13 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/tool
  * Creates contract configurations for deployment
  */
 function createContracts(contractsToWire: OmniPointHardhat[]): OAppOmniGraphHardhat['contracts'] {
-    const shouldDelegate = process.env.SET_DELEGATE === '1'
+    const skipDelegate = process.env.SKIP_DELEGATE === '1'
 
     return contractsToWire.map((contract) => ({
         contract,
         config: {
             owner: OwnershipTransfer[contract.eid],
-            delegate: shouldDelegate ? OwnershipTransfer[contract.eid] : undefined,
+            delegate: skipDelegate ? undefined : OwnershipTransfer[contract.eid],
         },
     }))
 }

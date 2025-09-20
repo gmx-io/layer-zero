@@ -1,3 +1,6 @@
+import fs from 'fs'
+import path from 'path'
+
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 
@@ -5,11 +8,12 @@ import { createModuleLogger, setDefaultLogLevel } from '@layerzerolabs/io-devtoo
 
 interface WireArgs {
     marketPair: string
+    stage: 'mainnet' | 'testnet'
     tokenType?: 'GM' | 'GLV'
     signer?: string
     gmSigner?: string
     glvSigner?: string
-    setDelegate?: boolean
+    skipDelegate?: boolean
     generatePayloads?: boolean
     dryRun?: boolean
     assert?: boolean
@@ -22,8 +26,9 @@ async function wireTokenType(
     hre: HardhatRuntimeEnvironment,
     marketPair: string,
     tokenType: 'GM' | 'GLV',
+    stage: 'mainnet' | 'testnet',
     signer: string | undefined,
-    setDelegate: boolean,
+    skipDelegate: boolean,
     generatePayloads: boolean,
     dryRun: boolean,
     assert: boolean,
@@ -32,7 +37,7 @@ async function wireTokenType(
     logger: ReturnType<typeof createModuleLogger>
 ): Promise<void> {
     // Determine config file based on token type
-    const configFile = tokenType === 'GM' ? 'layerzero.gm.mainnet.config.ts' : 'layerzero.glv.mainnet.config.ts'
+    const configFile = tokenType === 'GM' ? `layerzero.gm.${stage}.config.ts` : `layerzero.glv.${stage}.config.ts`
 
     // Determine signer address - use provided signer or auto-detect from HRE named accounts
     let signerAddress: string
@@ -41,6 +46,7 @@ async function wireTokenType(
     } else {
         // Get signer from HRE named accounts
         const { deployerGM, deployerGLV } = await hre.getNamedAccounts()
+        logger.verbose(`Named accounts: deployerGM: ${deployerGM}, deployerGLV: ${deployerGLV}`)
         const autoSigner = tokenType === 'GM' ? deployerGM : deployerGLV
 
         if (!autoSigner) {
@@ -52,16 +58,31 @@ async function wireTokenType(
     }
 
     logger.info(`Wiring ${tokenType} contracts for ${marketPair}`)
-    logger.info(`Config: ${configFile}`)
+    logger.verbose(`Config: ${configFile}`)
     logger.info(`Signer: ${signerAddress}`)
-    logger.info(`Delegate: ${setDelegate ? 'Yes' : 'No'}`)
+    // Force delegate when generatePayloads is enabled
+    const effectiveSkipDelegate = generatePayloads ? false : skipDelegate
+    logger.info(`Delegate: ${effectiveSkipDelegate ? 'No' : 'Yes'}`)
+    if (generatePayloads && skipDelegate) {
+        logger.info('⚠️  Overriding --skip-delegate because --generate-payloads requires delegation')
+    }
 
     // Generate output filename if generatePayloads is enabled
     let outputFilename: string | undefined
     if (generatePayloads) {
+        // Create payloads directory if it doesn't exist
+        const payloadsDir = path.join(process.cwd(), 'payloads')
+        if (!fs.existsSync(payloadsDir)) {
+            fs.mkdirSync(payloadsDir, { recursive: true })
+            logger.info(`Created payloads directory: ${payloadsDir}`)
+        }
+
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const delegateStr = setDelegate ? '-delegated' : ''
-        outputFilename = `wire-payloads-${marketPair}-${tokenType}${delegateStr}-${timestamp}.json`
+        const delegateStr = effectiveSkipDelegate ? '-no-delegate' : '-delegated'
+        outputFilename = path.join(
+            payloadsDir,
+            `wire-payloads-${marketPair}-${tokenType}${delegateStr}-${timestamp}.json`
+        )
         logger.info(`Payloads will be saved to: ${outputFilename}`)
     }
 
@@ -72,18 +93,20 @@ async function wireTokenType(
         // Backup and set environment variables
         oldEnvVars.MARKET_PAIR = process.env.MARKET_PAIR
         oldEnvVars.TOKEN_TYPE = process.env.TOKEN_TYPE
-        oldEnvVars.SET_DELEGATE = process.env.SET_DELEGATE
+        oldEnvVars.SKIP_DELEGATE = process.env.SKIP_DELEGATE
 
         process.env.MARKET_PAIR = marketPair
         process.env.TOKEN_TYPE = tokenType
-        if (setDelegate) {
+        if (effectiveSkipDelegate) {
             process.env.SET_DELEGATE = '1'
         }
 
         // Prepare arguments for the LayerZero wire command
-        const wireArgs: Record<string, string | boolean> = {
+        const wireArgs: Record<string, string | boolean | object> = {
             oappConfig: configFile,
-            signer: signerAddress,
+            signer: signer
+                ? { type: 'address', address: signerAddress }
+                : { type: 'name', name: tokenType === 'GM' ? 'deployerGM' : 'deployerGLV' },
         }
 
         // Add optional flags
@@ -111,7 +134,7 @@ async function wireTokenType(
             }
         }
         // Clean up SET_DELEGATE if it was set
-        if (setDelegate && !oldEnvVars.SET_DELEGATE) {
+        if (effectiveSkipDelegate && !oldEnvVars.SKIP_DELEGATE) {
             delete process.env.SET_DELEGATE
         }
     }
@@ -119,12 +142,13 @@ async function wireTokenType(
 
 const wire = task('lz:sdk:wire', 'Wire LayerZero contracts with automatic config and signer selection')
     .addParam('marketPair', 'Market pair to wire (e.g., WETH_USDC)')
+    .addOptionalParam('stage', 'Stage to wire (e.g., mainnet or testnet)', 'mainnet')
     .addOptionalParam('tokenType', 'Token type to wire (GM or GLV). If not specified, wires both.')
     .addOptionalParam('signer', 'Public key/address of signer (overrides automatic selection)')
     .addOptionalParam('gmSigner', 'Public key/address of signer for GM contracts (only used when wiring both)')
     .addOptionalParam('glvSigner', 'Public key/address of signer for GLV contracts (only used when wiring both)')
     .addOptionalParam('logLevel', 'Logging level (error, warn, info, verbose, debug, silly)', 'info')
-    .addFlag('setDelegate', 'Set ownership delegation to predefined addresses')
+    .addFlag('skipDelegate', 'Skip ownership delegation to predefined addresses')
     .addFlag('generatePayloads', 'Generate transaction payloads and save to JSON file')
     .addFlag('dryRun', 'Perform dry run without executing transactions')
     .addFlag('assert', 'Assert mode - fail if transactions are required')
@@ -132,11 +156,12 @@ const wire = task('lz:sdk:wire', 'Wire LayerZero contracts with automatic config
     .setAction(async (taskArgs: WireArgs, hre: HardhatRuntimeEnvironment) => {
         const {
             marketPair,
+            stage,
             tokenType,
             signer,
             gmSigner,
             glvSigner,
-            setDelegate,
+            skipDelegate,
             generatePayloads,
             dryRun,
             assert,
@@ -162,8 +187,9 @@ const wire = task('lz:sdk:wire', 'Wire LayerZero contracts with automatic config
                     hre,
                     marketPair,
                     tokenType,
+                    stage,
                     signer,
-                    setDelegate || false,
+                    skipDelegate || false,
                     generatePayloads || false,
                     dryRun || false,
                     assert || false,
@@ -188,8 +214,9 @@ const wire = task('lz:sdk:wire', 'Wire LayerZero contracts with automatic config
                         hre,
                         marketPair,
                         type,
+                        stage,
                         actualSigner,
-                        setDelegate || false,
+                        skipDelegate || false,
                         generatePayloads || false,
                         dryRun || false,
                         assert || false,

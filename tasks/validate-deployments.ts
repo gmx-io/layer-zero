@@ -32,7 +32,10 @@ interface ValidationResult {
 }
 
 const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT deployments by testing quoteSend() calls')
-    .addOptionalParam('filterNetworks', 'Filter by specific network (e.g., arbitrum-mainnet)')
+    .addOptionalParam(
+        'filterNetworks',
+        'Filter by specific networks (e.g., arbitrum-mainnet or arbitrum-mainnet,base-mainnet)'
+    )
     .addFlag('mainnet', 'Show only mainnet deployments')
     .addFlag('testnet', 'Show only testnet deployments')
     .addOptionalParam('marketPair', 'Filter by specific market pair (e.g., WETH_USDC)')
@@ -53,21 +56,44 @@ const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT de
             }
         }
 
-        const networks = fs
+        const allNetworks = fs
             .readdirSync(deploymentsDir, { withFileTypes: true })
             .filter((dirent) => dirent.isDirectory())
             .map((dirent) => dirent.name)
-            .filter((network) => {
-                if (taskArgs.filterNetworks) return network === taskArgs.filterNetworks
-                if (taskArgs.mainnet) return network.includes('mainnet') && !network.includes('testnet')
-                if (taskArgs.testnet) return network.includes('testnet')
-                return true
-            })
+
+        const sourceNetworks = taskArgs.filterNetworks
+            ? taskArgs.filterNetworks
+                  .split(',')
+                  .map((n: string) => n.trim())
+                  .filter((network: string) => allNetworks.includes(network))
+            : allNetworks.filter((network) => {
+                  if (taskArgs.mainnet) return network.includes('mainnet') && !network.includes('testnet')
+                  if (taskArgs.testnet) return network.includes('testnet')
+                  return true
+              })
+
+        // Validate that all requested networks exist
+        if (taskArgs.filterNetworks) {
+            const requestedNetworks = taskArgs.filterNetworks.split(',').map((n: string) => n.trim())
+            const missingNetworks = requestedNetworks.filter((network: string) => !allNetworks.includes(network))
+            if (missingNetworks.length > 0) {
+                console.log(`❌ Networks not found in deployments: ${missingNetworks.join(', ')}`)
+                console.log(`Available networks: ${allNetworks.join(', ')}`)
+                return
+            }
+        }
+
+        const targetNetworks = allNetworks.filter((network) => {
+            if (taskArgs.mainnet) return network.includes('mainnet') && !network.includes('testnet')
+            if (taskArgs.testnet) return network.includes('testnet')
+            return true
+        })
 
         const grouped: GroupedDeployments = {}
 
-        // Collect all deployments
-        for (const network of networks) {
+        // Collect all deployments (source + target networks)
+        const networksToScan = [...new Set([...sourceNetworks, ...targetNetworks])]
+        for (const network of networksToScan) {
             const networkDir = path.join(deploymentsDir, network)
             const files = fs
                 .readdirSync(networkDir)
@@ -146,8 +172,12 @@ const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT de
                 // Create validation matrix
                 const results: ValidationResult[] = []
 
-                for (const srcContract of contracts) {
-                    for (const dstContract of contracts) {
+                // Filter contracts by source/target networks
+                const sourceContracts = contracts.filter((c) => sourceNetworks.includes(c.network))
+                const targetContracts = contracts.filter((c) => targetNetworks.includes(c.network))
+
+                for (const srcContract of sourceContracts) {
+                    for (const dstContract of targetContracts) {
                         // Skip same network
                         if (srcContract.network === dstContract.network) continue
 
@@ -155,9 +185,20 @@ const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT de
                             const srcHre = await getHreByEid(srcContract.eid)
                             const signer = (await srcHre.ethers.getSigners())[0]
 
-                            // Get OFT contract
-                            const oftArtifact = await srcHre.artifacts.readArtifact('OFT')
-                            const oft = await srcHre.ethers.getContractAt(oftArtifact.abi, srcContract.address, signer)
+                            // Read deployment file to get ABI
+                            const deploymentPath = path.join(
+                                deploymentsDir,
+                                srcContract.network,
+                                `${tokenType === 'GM' ? 'MarketToken' : 'GlvToken'}_${srcContract.contractType}_${marketPair}.json`
+                            )
+                            const deploymentData = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'))
+
+                            // Get contract using deployment ABI
+                            const oft = await srcHre.ethers.getContractAt(
+                                deploymentData.abi,
+                                srcContract.address,
+                                signer
+                            )
 
                             // Prepare sendParam with 1 token (18 decimals assumed)
                             const sendParam = {
@@ -190,9 +231,15 @@ const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT de
                 }
 
                 // Display results in table format
-                const networkNames = [...new Set([...results.map((r) => r.from), ...results.map((r) => r.to)])].sort()
+                const displaySourceNetworks = taskArgs.filterNetworks
+                    ? sourceNetworks
+                    : [...new Set(results.map((r) => r.from))].sort()
+                const displayTargetNetworks = taskArgs.filterNetworks
+                    ? targetNetworks
+                    : [...new Set(results.map((r) => r.to))].sort()
+                const allDisplayNetworks = [...new Set([...displaySourceNetworks, ...displayTargetNetworks])].sort()
 
-                if (networkNames.length === 0) {
+                if (allDisplayNetworks.length === 0) {
                     console.log('No cross-network paths to validate\n')
                     continue
                 }
@@ -202,22 +249,22 @@ const validateDeployments = task('lz:sdk:validate-deployments', 'Validate OFT de
 
                 // Create table with cli-table3
                 const table = new CliTable({
-                    head: ['FROM \\ TO', ...networkNames.map((n) => cleanNetworkName(n).substring(0, 8))],
+                    head: ['FROM \\ TO', ...displayTargetNetworks.map((n) => cleanNetworkName(n).substring(0, 8))],
                     style: {
                         head: ['cyan'],
                         border: ['grey'],
                     },
                 })
 
-                // Add table rows
-                for (const fromNetwork of networkNames) {
+                // Add table rows - only show source networks that we're testing from
+                for (const fromNetwork of displaySourceNetworks) {
                     const row: string[] = [cleanNetworkName(fromNetwork)]
-                    for (const toNetwork of networkNames) {
+                    for (const toNetwork of displayTargetNetworks) {
                         if (fromNetwork === toNetwork) {
                             row.push('▬') // Same network indicator
                         } else {
                             const result = results.find((r) => r.from === fromNetwork && r.to === toNetwork)
-                            row.push(result?.success ? '✅' : '❌')
+                            row.push(result?.success ? '✅' : result ? '❌' : '—')
                         }
                     }
                     table.push(row)

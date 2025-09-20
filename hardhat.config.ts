@@ -24,6 +24,8 @@ const accounts: HttpNetworkAccountsUserConfig | undefined =
         ? [PRIVATE_KEY_GM_DEPLOYER, PRIVATE_KEY_GLV_DEPLOYER]
         : undefined
 
+const hardhatAccounts = accounts?.map((key) => ({ privateKey: key, balance: '10000000000000000000000' }))
+
 if (accounts == null) {
     console.warn(
         'Could not find MNEMONIC or PRIVATE_KEY environment variables. It will not be possible to execute transactions in your example.'
@@ -91,6 +93,7 @@ const config: HardhatUserConfig = {
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit
             allowUnlimitedContractSize: true,
+            accounts: hardhatAccounts,
         },
     },
     namedAccounts: {

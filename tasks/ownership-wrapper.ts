@@ -1,3 +1,4 @@
+import { Wallet } from 'ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 
@@ -6,6 +7,7 @@ import { createModuleLogger, setDefaultLogLevel } from '@layerzerolabs/io-devtoo
 interface OwnershipArgs {
     marketPair: string
     tokenType?: 'GM' | 'GLV'
+    stage?: 'mainnet' | 'testnet'
     signer?: string
     gmSigner?: string
     glvSigner?: string
@@ -21,44 +23,64 @@ async function transferOwnershipForTokenType(
     hre: HardhatRuntimeEnvironment,
     marketPair: string,
     tokenType: 'GM' | 'GLV',
-    signer: string | undefined,
-    safe: boolean,
-    dryRun: boolean,
-    assert: boolean,
-    ci: boolean,
-    logLevel: string,
-    logger: ReturnType<typeof createModuleLogger>
+    stage: 'mainnet' | 'testnet',
+    signer?: string,
+    safe?: boolean,
+    dryRun?: boolean,
+    assert?: boolean,
+    ci?: boolean,
+    logLevel?: string
 ): Promise<void> {
+    setDefaultLogLevel(logLevel || 'info')
+    const logger = createModuleLogger('transfer-ownership', logLevel || 'info')
+
     // Determine config file based on token type
-    const configFile = tokenType === 'GM' ? 'layerzero.gm.mainnet.config.ts' : 'layerzero.glv.mainnet.config.ts'
+    const configFile = tokenType === 'GM' ? `layerzero.gm.${stage}.config.ts` : `layerzero.glv.${stage}.config.ts`
 
-    // Determine signer address - use provided signer or auto-detect from HRE named accounts
-    let signerAddress: string
+    process.env.MARKET_PAIR = marketPair
+    process.env.TOKEN_TYPE = tokenType
+
+    // Determine signer - prefer CLI arg, then env private keys, then named accounts
+    let signerValue: string
     if (signer) {
-        signerAddress = signer
+        signerValue = signer
     } else {
-        // Get signer from HRE named accounts
-        const { deployerGM, deployerGLV } = await hre.getNamedAccounts()
-        const autoSigner = tokenType === 'GM' ? deployerGM : deployerGLV
+        const envPk = tokenType === 'GM' ? process.env.PRIVATE_KEY_GM_DEPLOYER : process.env.PRIVATE_KEY_GLV_DEPLOYER
 
-        if (!autoSigner) {
-            throw new Error(
-                `No ${tokenType === 'GM' ? 'deployerGM' : 'deployerGLV'} account found in named accounts. Provide --signer flag or configure named accounts in hardhat.config.ts.`
+        if (envPk) {
+            signerValue = new Wallet(envPk).address
+            logger.info(
+                `Using ${tokenType === 'GM' ? 'PRIVATE_KEY_GM_DEPLOYER' : 'PRIVATE_KEY_GLV_DEPLOYER'} from env: ${signerValue}`
             )
+        } else {
+            const { deployerGM, deployerGLV } = await hre.getNamedAccounts()
+            const signerAddress = tokenType === 'GM' ? deployerGM : deployerGLV
+
+            if (!signerAddress) {
+                throw new Error(
+                    `Missing ${
+                        tokenType === 'GM' ? 'deployerGM' : 'deployerGLV'
+                    } signer. Provide --signer, set env private key, or configure namedAccounts.`
+                )
+            }
+
+            signerValue = signerAddress
+            logger.info(`Using named account ${tokenType === 'GM' ? 'deployerGM' : 'deployerGLV'}: ${signerAddress}`)
         }
-        signerAddress = autoSigner
     }
 
     logger.info(`Transferring ownership for ${tokenType} contracts for ${marketPair}`)
-    logger.info(`Config: ${configFile}`)
-    logger.info(`Signer: ${signerAddress}`)
+    logger.verbose(`Config: ${configFile}`)
+    logger.info(`Signer: ${signerValue}`)
     logger.info(`Safe: ${safe ? 'Yes' : 'No'}`)
 
     try {
         // Prepare arguments for the LayerZero ownership transfer command
-        const ownershipArgs: Record<string, string | boolean> = {
+        const ownershipArgs: Record<string, string | boolean | object> = {
             oappConfig: configFile,
-            signer: signerAddress,
+            signer: signer
+                ? { type: 'address', address: signerValue }
+                : { type: 'name', name: tokenType === 'GM' ? 'deployerGM' : 'deployerGLV' },
         }
 
         // Add optional flags
@@ -88,6 +110,7 @@ const transferOwnership = task(
         'tokenType',
         'Token type to transfer ownership for (GM or GLV). If not specified, transfers both.'
     )
+    .addOptionalParam('stage', 'Stage to transfer ownership for (mainnet, testnet, sandbox)', 'mainnet')
     .addOptionalParam('signer', 'Public key/address of signer (overrides automatic selection)')
     .addOptionalParam('gmSigner', 'Public key/address of signer for GM contracts (only used when transferring both)')
     .addOptionalParam('glvSigner', 'Public key/address of signer for GLV contracts (only used when transferring both)')
@@ -97,7 +120,8 @@ const transferOwnership = task(
     .addFlag('assert', 'Assert mode - fail if transactions are required')
     .addFlag('ci', 'Continuous integration mode (non-interactive)')
     .setAction(async (taskArgs: OwnershipArgs, hre: HardhatRuntimeEnvironment) => {
-        const { marketPair, tokenType, signer, gmSigner, glvSigner, safe, dryRun, assert, ci, logLevel } = taskArgs
+        const { marketPair, tokenType, stage, signer, gmSigner, glvSigner, safe, dryRun, assert, ci, logLevel } =
+            taskArgs
 
         setDefaultLogLevel(logLevel || 'info')
         const logger = createModuleLogger('transfer-ownership', logLevel || 'info')
@@ -117,13 +141,13 @@ const transferOwnership = task(
                     hre,
                     marketPair,
                     tokenType,
+                    stage || 'mainnet',
                     signer,
-                    safe || false,
-                    dryRun || false,
-                    assert || false,
-                    ci || false,
-                    logLevel || 'info',
-                    logger
+                    safe,
+                    dryRun,
+                    assert,
+                    ci,
+                    logLevel
                 )
             } else {
                 // Transfer ownership for both GM and GLV
@@ -142,13 +166,13 @@ const transferOwnership = task(
                         hre,
                         marketPair,
                         type,
+                        stage || 'mainnet',
                         actualSigner,
-                        safe || false,
-                        dryRun || false,
-                        assert || false,
-                        ci || false,
-                        logLevel || 'info',
-                        logger
+                        safe,
+                        dryRun,
+                        assert,
+                        ci,
+                        logLevel
                     )
                 }
             }

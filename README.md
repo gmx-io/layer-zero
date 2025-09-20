@@ -15,6 +15,7 @@ This project provides a comprehensive deployment and configuration system for GM
 ## 🚀 Setup
 
 ### Prerequisites
+
 - Node.js 18+
 - pnpm (package manager)
 - Private keys for deployer accounts
@@ -59,10 +60,11 @@ pnpm install
 The project supports multiple market pairs configured in `devtools/config/tokens.ts`:
 
 - **`WETH_USDC`** - WETH/USDC pair (Arbitrum mainnet hub)
-- **`WBTC_USDC`** - WBTC/USDC pair (Arbitrum mainnet hub)  
+- **`WBTC_USDC`** - WBTC/USDC pair (Arbitrum mainnet hub)
 - **`WETH_USDC_SG`** - WETH/USDC Staging (Arbitrum testnet hub)
 
 Each market pair contains:
+
 - **GM Token**: Market token configuration
 - **GLV Token**: Liquidity vault token configuration
 - **Hub Network**: Primary network with existing token contracts (deploys adapters)
@@ -105,7 +107,7 @@ npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
 # Deploy only GM contracts to mainnet
 npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --tokenType GM
 
-# Deploy only GLV contracts to mainnet  
+# Deploy only GLV contracts to mainnet
 npx hardhat lz:sdk:deploy --stage mainnet --marketPair WBTC_USDC --tokenType GLV
 
 # Deploy all contracts to testnet networks
@@ -124,7 +126,8 @@ The deployment system automatically determines:
 - **Network Filtering**: Only deploys to networks configured for the selected market pair
 - **Automatic Skipping**: Skips networks not in the market pair's hub or expansion networks
 
-**Important**: 
+**Important**:
+
 - Even if your `hardhat.config.ts` defines 10 networks, if your market pair only configures 3 networks (1 hub + 2 expansion), deployments and wiring will **only** occur on those 3 networks. Other networks are automatically skipped.
 - The deploy script deploys **adapters** on hub networks and **OFTs** on expansion networks.
 - Hub networks must **NOT** be included in expansion networks - there's automatic validation that prevents this.
@@ -195,6 +198,7 @@ The project includes enhanced Hardhat tasks that simplify deployment and wiring 
 ### 🚀 Deployment Tasks
 
 #### Deploy (Base Command)
+
 ```bash
 # Deploy with automatic market pair handling
 npx hardhat lz:sdk:deploy --marketPair WETH_USDC --stage mainnet
@@ -210,6 +214,7 @@ npx hardhat lz:sdk:deploy --marketPair WETH_USDC --stage mainnet --logLevel debu
 ```
 
 #### Deploy Examples by Stage
+
 ```bash
 # Deploy all contracts to mainnet networks
 npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC
@@ -233,6 +238,7 @@ npx hardhat lz:sdk:deploy --stage mainnet --marketPair WETH_USDC --ci
 ### 🔗 Wiring Tasks
 
 #### Wire (Unified Command)
+
 ```bash
 # Wire both GM and GLV contracts with automatic signer detection
 npx hardhat lz:sdk:wire --marketPair WETH_USDC
@@ -274,6 +280,7 @@ npx hardhat lz:sdk:wire --marketPair WETH_USDC --ci
 ### 🔐 Ownership Transfer Tasks
 
 #### Transfer Ownership (Unified Command)
+
 ```bash
 # Transfer ownership for both GM and GLV contracts
 npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC
@@ -309,6 +316,7 @@ npx hardhat lz:sdk:transfer-ownership --market-pair WETH_USDC --log-level verbos
 ### 📊 Management Tasks
 
 #### Display Deployments
+
 ```bash
 # Show all deployed contracts grouped by market pair
 npx hardhat lz:sdk:display-deployments
@@ -324,6 +332,7 @@ npx hardhat lz:sdk:display-deployments --filterNetworks arbitrum-mainnet
 ```
 
 #### Validate Deployments
+
 ```bash
 # Validate all LayerZero deployments by testing quoteSend() calls
 npx hardhat lz:sdk:validate-deployments
@@ -345,6 +354,7 @@ npx hardhat lz:sdk:validate-deployments --filterNetworks arbitrum-mainnet
 ```
 
 #### Validate Configuration
+
 ```bash
 # Validate token configuration against on-chain data
 npx hardhat lz:sdk:validate-config
@@ -355,17 +365,20 @@ npx hardhat lz:sdk:validate-config
 The enhanced tasks automatically detect signers from Hardhat's named accounts configuration. However, you can override this behavior:
 
 #### Automatic Signer Detection
+
 - **GM contracts**: Uses `deployerGM` from named accounts
 - **GLV contracts**: Uses `deployerGLV` from named accounts
 - **Fallback**: Manual signer specification via `--signer` flag
 
 #### Manual Signer Override
+
 ```bash
 # Use specific signer address (overrides automatic detection)
 npx hardhat lz:sdk:wire --marketPair WETH_USDC --tokenType GM --signer 0x1234567890123456789012345678901234567890
 ```
 
 #### Payload Generation for Multisig
+
 When generating payloads for multisig execution, the specific private key doesn't matter since transactions aren't executed:
 
 ```bash
@@ -384,6 +397,7 @@ npx hardhat lz:sdk:wire --marketPair WETH_USDC --generatePayloads
 ### 📝 Task Output Examples
 
 #### Deploy Task Output
+
 ```
 info:    [deploy-wrapper] Deploying contracts for market pair: WETH_USDC
 info:    [deploy-wrapper] Stage: mainnet
@@ -393,6 +407,7 @@ info:    [deploy-wrapper] ✅ Deploy command completed successfully!
 ```
 
 #### Wire Task Output
+
 ```
 info:    [wire] Wiring all contracts for WETH_USDC
 info:    [wire] Wiring GM contracts for WETH_USDC
@@ -412,6 +427,7 @@ info:    [wire] ✅ All wiring completed successfully!
 ```
 
 #### Ownership Transfer Task Output
+
 ```
 info:    [transfer-ownership] Transferring ownership for all contracts for WETH_USDC
 info:    [transfer-ownership] Transferring ownership for GM contracts for WETH_USDC
@@ -430,6 +446,7 @@ info:    [transfer-ownership] ✅ All ownership transfers completed successfully
 ```
 
 #### Display Deployments Output
+
 ```
 Deployed Contracts by Market Pair
 
@@ -460,6 +477,7 @@ Summary: 2 market pairs, 8 contracts
 - **`layerzero.mainnet.config.ts`**: Mainnet wiring configuration
 
 These files use the wire generator to automatically:
+
 - Create pathways between hub and expansion networks
 - Set appropriate enforced options (hub vs spoke)
 - Configure DVNs and block confirmations
@@ -568,30 +586,30 @@ npx hardhat lz:sdk:display-deployments
 
 ```typescript
 const NEW_PAIR: MarketPairConfig = {
-    GM: {
-        tokenName: 'GM NEW-PAIR',
-        tokenSymbol: 'GM NEW-PAIR',
-        hubNetwork: {
-            eid: EndpointId.ARBITRUM_V2_MAINNET,
-            contractAddress: '0x...',
-        },
-        expansionNetworks: ExpansionNetworks.mainnet,
+  GM: {
+    tokenName: "GM NEW-PAIR",
+    tokenSymbol: "GM NEW-PAIR",
+    hubNetwork: {
+      eid: EndpointId.ARBITRUM_V2_MAINNET,
+      contractAddress: "0x...",
     },
-    GLV: {
-        tokenName: 'GMX Liquidity Vault [NEW-PAIR]',
-        tokenSymbol: 'GLV [NEW-PAIR]',
-        hubNetwork: {
-            eid: EndpointId.ARBITRUM_V2_MAINNET,
-            contractAddress: '0x...',
-        },
-        expansionNetworks: ExpansionNetworks.mainnet,
+    expansionNetworks: ExpansionNetworks.mainnet,
+  },
+  GLV: {
+    tokenName: "GMX Liquidity Vault [NEW-PAIR]",
+    tokenSymbol: "GLV [NEW-PAIR]",
+    hubNetwork: {
+      eid: EndpointId.ARBITRUM_V2_MAINNET,
+      contractAddress: "0x...",
     },
-}
+    expansionNetworks: ExpansionNetworks.mainnet,
+  },
+};
 
 export const Tokens: Config = {
-    // ... existing pairs
-    NEW_PAIR,
-}
+  // ... existing pairs
+  NEW_PAIR,
+};
 ```
 
 2. Deploy with new market pair:
@@ -606,21 +624,21 @@ MARKET_PAIR=NEW_PAIR npx hardhat lz:deploy
 
 ```typescript
 export const BlockConfirmations: Partial<Record<EndpointId, number>> = {
-    // ... existing networks
-    [EndpointId.NEW_NETWORK]: 10,
-}
+  // ... existing networks
+  [EndpointId.NEW_NETWORK]: 10,
+};
 
 export const OwnershipTransfer: Partial<Record<EndpointId, string>> = {
-    // ... existing networks
-    [EndpointId.NEW_NETWORK]: '0x...',
-}
+  // ... existing networks
+  [EndpointId.NEW_NETWORK]: "0x...",
+};
 
 export const ExpansionNetworks = {
-    mainnet: [
-        // ... existing networks
-        EndpointId.NEW_NETWORK,
-    ],
-}
+  mainnet: [
+    // ... existing networks
+    EndpointId.NEW_NETWORK,
+  ],
+};
 ```
 
 2. Update `hardhat.config.ts`:
@@ -656,6 +674,7 @@ networks: {
 ### Wire Generation
 
 The wire generator automatically:
+
 - Creates contracts for all configured networks
 - Determines adapter vs OFT based on hub network
 - Sets appropriate enforced options for hub/spoke communication

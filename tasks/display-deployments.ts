@@ -3,6 +3,7 @@ import path from 'path'
 
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
+
 import { createModuleLogger, setDefaultLogLevel } from '@layerzerolabs/io-devtools'
 
 interface DeploymentInfo {

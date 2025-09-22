@@ -8,6 +8,7 @@ import 'dotenv/config'
 import 'hardhat-deploy'
 import 'hardhat-contract-sizer'
 import '@nomiclabs/hardhat-ethers'
+import '@nomicfoundation/hardhat-verify'
 import '@layerzerolabs/toolbox-hardhat'
 import { HardhatUserConfig, HttpNetworkAccountsUserConfig } from 'hardhat/types'
 
@@ -103,6 +104,21 @@ const config: HardhatUserConfig = {
         deployerGLV: {
             default: 1, // GLV deployer (second in accounts array)
         },
+    },
+    etherscan: {
+        apiKey: {
+            'botanix-mainnet': 'not-required',
+        },
+        customChains: [
+            {
+                network: 'botanix-mainnet',
+                chainId: 3637,
+                urls: {
+                    apiURL: 'https://api.routescan.io/v2/network/mainnet/evm/3637/etherscan',
+                    browserURL: 'https://botanixscan.io',
+                },
+            },
+        ],
     },
 }
 

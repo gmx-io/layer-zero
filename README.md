@@ -396,7 +396,7 @@ npx hardhat lz:sdk:display-deployments
 │   └── MarketToken.ts           # GM token deployment
 ├── tasks/                       # Enhanced Hardhat tasks (lz:sdk:* commands)
 │   ├── deploy-wrapper.ts        # Enhanced deploy command
-│   ├── wire-wrapper.ts          # Enhanced wire command  
+│   ├── wire-wrapper.ts          # Enhanced wire command
 │   ├── ownership-wrapper.ts     # Enhanced ownership transfer command
 │   ├── validate-deployments.ts  # Deployment validation with quoteSend testing
 │   ├── validate-config.ts       # Configuration validation
@@ -410,7 +410,7 @@ npx hardhat lz:sdk:display-deployments
 │   ├── base-mainnet/
 │   └── ...                      # Other networks
 ├── layerzero.gm.mainnet.config.ts    # GM mainnet LayerZero configuration
-├── layerzero.gm.testnet.config.ts    # GM testnet LayerZero configuration  
+├── layerzero.gm.testnet.config.ts    # GM testnet LayerZero configuration
 ├── layerzero.glv.mainnet.config.ts   # GLV mainnet LayerZero configuration
 ├── layerzero.glv.testnet.config.ts   # GLV testnet LayerZero configuration
 └── hardhat.config.ts                 # Hardhat configuration with named accounts
@@ -576,6 +576,32 @@ npx hardhat lz:sdk:deploy --stage mainnet --market-pair WETH_USDC
 
 # 4. Wire all connections (including new network)
 npx hardhat lz:sdk:wire --market-pair WETH_USDC
+```
+
+### Verify Contracts
+
+Two methods to verify contracts are available.
+
+#### Standard JSON Files
+
+Manually verify contract in block explorers by generating standard JSON files (https://docs.soliditylang.org/en/latest/using-the-compiler.html#compiler-api).
+
+```bash
+pnpm ts-node scripts/standard-json-generator.ts
+```
+
+#### Hardhat Verify
+
+Use Hardhat verification plugin.
+
+```bash
+pnpm ts-node scripts/verify-contracts.ts botanix-mainnet
+```
+
+Optionally, pass the `--force` flag to force re-verification for already verified contracts through partial matches.
+
+```bash
+pnpm ts-node scripts/verify-contracts.ts botanix-mainnet --force
 ```
 
 ## Troubleshooting

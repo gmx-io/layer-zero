@@ -13,12 +13,12 @@ const buildInfoDir = 'artifacts/build-info'
 const buildFile = fs
     .readdirSync(buildInfoDir)
     .sort(
-        (a, b) =>
+        (a: string, b: string) =>
             fs.statSync(path.join(buildInfoDir, b)).mtime.getTime() -
             fs.statSync(path.join(buildInfoDir, a)).mtime.getTime()
     )[0]
 
-const buildInfo = require('./' + path.join(buildInfoDir, buildFile))
+const buildInfo = require('../' + path.join(buildInfoDir, buildFile))
 const { input, output } = buildInfo
 
 const sourceFiles = glob.sync('contracts/**/*.sol')

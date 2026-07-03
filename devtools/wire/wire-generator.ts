@@ -15,7 +15,7 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/tool
 /**
  * Creates contract configurations for deployment
  */
-function createContracts(contractsToWire: OmniPointHardhat[]): OAppOmniGraphHardhat['contracts'] {
+export function createContracts(contractsToWire: OmniPointHardhat[]): OAppOmniGraphHardhat['contracts'] {
     const skipDelegate = process.env.SKIP_DELEGATE === '1'
 
     return contractsToWire.map((contract) => ({
@@ -98,13 +98,11 @@ export async function generateWireConfig(
 
     // Determine token type and contract names
     const tokenConfig = contractType === 'GlvToken' ? config.GLV : config.GM
-    
+
     if (!tokenConfig) {
-        throw new Error(
-            `${contractType === 'GlvToken' ? 'GLV' : 'GM'} token is not configured for this market pair`
-        )
+        throw new Error(`${contractType === 'GlvToken' ? 'GLV' : 'GM'} token is not configured for this market pair`)
     }
-    
+
     const adapterContractName = `${contractType}_Adapter_${key}`
     const oftContractName = `${contractType}_OFT_${key}`
 

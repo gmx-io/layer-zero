@@ -33,11 +33,26 @@ const payloadsToSafe = task(
     )
     .setAction(async (args: PayloadsToSafeArgs, hre: HardhatRuntimeEnvironment) => {
         const patterns = args.input.split(',').map((p) => p.trim())
-        const files = patterns.flatMap((pattern) => (glob.hasMagic(pattern) ? glob.sync(pattern) : [pattern]))
 
-        if (files.length === 0) {
-            throw new Error(`No payload files matched input: ${args.input}`)
+        // Validated per-pattern, not just on the combined total: a `--input` with multiple
+        // comma-separated globs (e.g. combining receive-block + unpeer into one batch) must
+        // not silently drop one phase's transactions just because that glob happened to match
+        // nothing (e.g. because that phase's payloads were never generated).
+        const filesByPattern = patterns.map((pattern) => ({
+            pattern,
+            files: glob.hasMagic(pattern) ? (glob.sync(pattern) as string[]) : [pattern],
+        }))
+
+        const emptyPatterns = filesByPattern.filter(({ files }) => files.length === 0)
+        if (emptyPatterns.length > 0) {
+            throw new Error(
+                `The following --input pattern(s) matched no files:\n` +
+                    emptyPatterns.map(({ pattern }) => `  ${pattern}`).join('\n') +
+                    `\nGenerate the missing payloads first (or fix the glob) — refusing to write a Safe batch that's silently missing part of what you asked for.`
+            )
         }
+
+        const files = filesByPattern.flatMap(({ files }) => files)
 
         console.log(`Reading ${files.length} payload file(s):`)
         files.forEach((f: string) => console.log(`  ${f}`))

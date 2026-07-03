@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "chainId": "1",
+  "createdAt": 1783103429167,
+  "meta": {
+    "name": "Botanix removal - Stage 1: block send",
+    "description": "Points sendLibrary at BlockedMessageLib on all Botanix<->X pathways, both directions. Stops new messages; safe with anything already in flight.",
+    "txBuilderVersion": "1.16.5",
+    "createdFromSafeAddress": "0x8D1d2e24eC641eDC6a1ebe0F3aE7af0EBC573e0D"
+  },
+  "transactions": [
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff300000000000000000000000000b335e18ab68ccd2e8946a6e785d8be65f41310300000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    },
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff30000000000000000000000000fcff5015627b8ce9ceaa7f5b38a6679f65fe39a700000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    },
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff300000000000000000000000000bc5ab50fd581b34681a9be180179b1ef0b238c700000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    },
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff3000000000000000000000000091dd54aa8ba9dfde8b956cfb709a7c418f870e2100000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    },
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff300000000000000000000000003c21894169d669c5f0767c1289e71ec8d6132c0f00000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    },
+    {
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "value": "0",
+      "data": "0x9535ff300000000000000000000000005ece4d3f43d3bd8cbffc1d2ce851e7605d403d3c00000000000000000000000000000000000000000000000000000000000076a80000000000000000000000001ccbf0db9c192d969de57e25b3ff09a25bb1d862",
+      "contractMethod": null,
+      "contractInputsValues": null
+    }
+  ]
+}

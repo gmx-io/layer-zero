@@ -43,7 +43,6 @@ export const ExpansionNetworks = {
         EndpointId.BASE_V2_MAINNET,
         EndpointId.BERA_V2_MAINNET,
         EndpointId.BSC_V2_MAINNET,
-        EndpointId.BOTANIX_V2_MAINNET,
         EndpointId.ETHEREUM_V2_MAINNET,
     ] as EndpointId[],
 }

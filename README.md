@@ -187,7 +187,25 @@ npx hardhat lz:sdk:wire \
 
 ## Removing a Network from the Mesh
 
-**Important**: `lz:sdk:wire` only reconciles pathways that are explicitly present in the config file it's given — it never scans on-chain state for pathways that used to exist and resets them. Deleting a network from `ExpansionNetworks` stops *future* wire runs from touching it, but does **nothing on-chain** by itself. Actually disconnecting a network requires generating transactions that explicitly unset its send/receive libraries and peer, which is what the tooling below does.
+**Important**: `lz:sdk:wire` only reconciles pathways that are explicitly present in the config file it's given — it never scans on-chain state for pathways that used to exist and resets them. Removing a network from `ExpansionNetworks` would stop _future_ wire runs from touching it, but does **nothing on-chain** by itself, and permanently loses the historical record of what the mesh used to look like. Actually disconnecting a network requires generating transactions that explicitly unset its send/receive libraries and peer, which is what the tooling below does — and it's driven by config rather than deletion, so nothing needs to be removed from `ExpansionNetworks`/`hardhat.config.ts` at all.
+
+### Marking a Network as Unwired
+
+Add the network's eid to `UnwiredNetworks` in `devtools/config/networks.ts` (it stays listed in `ExpansionNetworks` — that array is kept as a permanent historical record of every network that's ever been part of the mesh):
+
+```typescript
+export const UnwiredNetworks = {
+  testnet: [] as EndpointId[],
+  mainnet: [EndpointId.BOTANIX_V2_MAINNET] as EndpointId[],
+};
+```
+
+This one addition does two things simultaneously, and should be the very first step, before generating any payloads:
+
+1. `generateWireConfig` (the normal `lz:sdk:wire` path) excludes any network listed here when building pathways — so a routine wire run for an unrelated market pair can't silently re-wire the network being removed while the staged teardown below is in progress, without deleting anything.
+2. `generateUnwireConfig` (the `lz:sdk:unwire` path) _requires_ its target to be listed here — this is a guard rail against accidentally unwiring a network that's still supposed to be active.
+
+**To reverse a removal at any point**: delete the eid from `UnwiredNetworks` and re-run the normal `lz:sdk:wire` flow — it resolves the correct current ULN302 and DVN addresses dynamically, so there's nothing else to restore. No other file needs to change, since nothing else was ever removed.
 
 ### Unwire Phases
 
@@ -259,9 +277,8 @@ It checks every deployed OApp contract on the target network's full message hist
 ### Full Removal Runbook
 
 ```bash
-# Step 0 — remove the network from devtools/config/networks.ts's ExpansionNetworks
-# immediately (not as final cleanup) so a routine lz:sdk:wire run for an unrelated
-# market pair can't silently re-wire the network being removed while this is in progress.
+# Step 0 — add the network's eid to UnwiredNetworks in devtools/config/networks.ts
+# (see "Marking a Network as Unwired" above), immediately, before generating any payloads.
 
 # Stage 1 — block send
 npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --generate-payloads --ci --signer 0x0000000000000000000000000000000000000001
@@ -280,14 +297,14 @@ npx hardhat lz:sdk:payloads-to-safe \
   --input "payloads/unwire-payloads-receive-block-botanix-mainnet-*.json,payloads/unwire-payloads-unpeer-botanix-mainnet-*.json" \
   --name "Botanix removal - Stage 3+4: block receive + unpeer" \
   --prefix stage3-4-receive-unpeer
-# -> hand the combined per-chain payloads/stage3-4-receive-unpeer-chain-<id>.json batches to the team for Safe execution
 
-# Final cleanup — only after all of the above has executed on-chain:
-# remove the network's remaining entries from BlockConfirmations/OwnershipTransfer in
-# devtools/config/networks.ts, and its network block from hardhat.config.ts.
+# No cleanup step needed — the network was never removed from ExpansionNetworks or
+# hardhat.config.ts, so there's nothing left to undo once Stage 3+4 executes on-chain.
 ```
 
-**To reverse or pause**: any stage is safe to leave in place indefinitely (nothing time-sensitive breaks by stopping after Stage 1, in particular). To fully restore a pathway, don't hand-craft a "set back to the real library" transaction — re-add the network to `ExpansionNetworks`/`OwnershipTransfer`/`BlockConfirmations` and re-run the normal `lz:sdk:wire` flow, which resolves the correct current ULN302 and DVN addresses dynamically rather than relying on a hardcoded value that could go stale.
+**To reverse or pause**: any stage is safe to leave in place indefinitely (nothing time-sensitive breaks by stopping after Stage 1, in particular). To fully restore a pathway, delete the network's eid from `UnwiredNetworks` and re-run the normal `lz:sdk:wire` flow — it resolves the correct current ULN302 and DVN addresses dynamically rather than relying on a hardcoded value that could go stale.
+
+Every phase is idempotent in exactly the same way normal wiring is: `lz:sdk:unwire` runs through the identical on-chain diff engine as `lz:sdk:wire` (the same `configureSendLibraries`/`configureReceiveLibraries`/`configureOAppPeers` configurators), so re-running a phase that's already fully applied on-chain reports "no action necessary" and generates zero transactions, rather than re-proposing something already done. Use `--dry-run` (preview, no files written) or `--assert` (fails if any transaction is still required) to check a phase's status before generating payloads for it.
 
 ## Enhanced Task Commands
 
@@ -491,7 +508,7 @@ npx hardhat lz:sdk:display-deployments
 
 ## Project Structure
 
-```
+```text
 ├── devtools/                    # Development utilities
 │   ├── config/                  # Configuration data
 │   │   ├── networks.ts          # Network settings (confirmations, ownership)
@@ -580,7 +597,7 @@ export const Tokens: Config = {
 };
 ```
 
-2. Deploy with new market pair:
+1. Deploy with new market pair:
 
 ```bash
 npx hardhat lz:sdk:deploy --market-pair WETH_USDC
@@ -609,7 +626,7 @@ export const ExpansionNetworks = {
 };
 ```
 
-2. Update `hardhat.config.ts`:
+1. Update `hardhat.config.ts`:
 
 ```typescript
 networks: {
@@ -713,7 +730,8 @@ npx hardhat lz:sdk:wire --market-pair WETH_USDC
 See [Removing a Network from the Mesh](#removing-a-network-from-the-mesh) for the full staged runbook — summarized:
 
 ```bash
-# 1. Remove the network from ExpansionNetworks in devtools/config/networks.ts
+# 1. Add the network's eid to UnwiredNetworks in devtools/config/networks.ts
+#    (it stays in ExpansionNetworks and hardhat.config.ts — nothing is deleted)
 
 # 2. Stage 1: block send, then hand the Safe batch to the team for execution
 npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase send-block --generate-payloads --ci
@@ -727,8 +745,7 @@ npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase receive-block --gen
 npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase unpeer --generate-payloads --ci
 npx hardhat lz:sdk:payloads-to-safe --input "payloads/unwire-payloads-receive-block-<NETWORK>-*.json,payloads/unwire-payloads-unpeer-<NETWORK>-*.json" --name "Stage 3+4" --prefix stage3-4-receive-unpeer
 
-# 5. Once everything above has executed on-chain, remove the network's remaining
-#    entries from devtools/config/networks.ts and hardhat.config.ts
+# No cleanup step — nothing was removed, so there's nothing to undo.
 ```
 
 ### Verify Contracts
@@ -737,7 +754,7 @@ Two methods to verify contracts are available.
 
 #### Standard JSON Files
 
-Manually verify contract in block explorers by generating standard JSON files (https://docs.soliditylang.org/en/latest/using-the-compiler.html#compiler-api).
+Manually verify contract in block explorers by generating standard JSON files (<https://docs.soliditylang.org/en/latest/using-the-compiler.html#compiler-api>).
 
 ```bash
 pnpm ts-node scripts/standard-json-generator.ts

@@ -6,6 +6,7 @@ import {
     EVM_ENFORCED_OPTIONS_TO_HUB,
     EVM_ENFORCED_OPTIONS_TO_SPOKE,
     OwnershipTransfer,
+    UnwiredNetworks,
 } from '../config'
 import { getDeployConfig, validateHubNetworksNotInExpansion } from '../deploy'
 import { MarketPairConfig } from '../types'
@@ -106,8 +107,14 @@ export async function generateWireConfig(
     const adapterContractName = `${contractType}_Adapter_${key}`
     const oftContractName = `${contractType}_OFT_${key}`
 
+    // Exclude any network currently being (or already) decommissioned via lz:sdk:unwire, even
+    // though it stays listed in `expansionNetworks` as historical record — see UnwiredNetworks'
+    // doc comment in devtools/config/networks.ts.
+    const unwiredEids = new Set<number>([...UnwiredNetworks.mainnet, ...UnwiredNetworks.testnet])
+    const activeExpansionNetworks = tokenConfig.expansionNetworks.filter((eid) => !unwiredEids.has(eid))
+
     // Include both hub network and expansion networks
-    const allNetworkEids = [tokenConfig.hubNetwork.eid, ...tokenConfig.expansionNetworks]
+    const allNetworkEids = [tokenConfig.hubNetwork.eid, ...activeExpansionNetworks]
     const contractsToWire = allNetworkEids.map(
         (eid): OmniPointHardhat => ({
             eid,

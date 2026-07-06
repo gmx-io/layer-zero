@@ -5,6 +5,7 @@ import { constants } from 'ethers'
 
 import { getNetworkNameForEid } from '@layerzerolabs/devtools-evm-hardhat'
 
+import { UnwiredNetworks } from '../config'
 import { getDeployConfig, validateHubNetworksNotInExpansion } from '../deploy'
 import { MarketPairConfig } from '../types'
 
@@ -36,10 +37,10 @@ export function hasDeploymentArtifact(networkName: string, contractName: string)
  * so the existing per-field configurators skip them, exactly as they do for any connection
  * with an omitted field.
  *
- * Deliberately does not validate `targetEid` via `expansionNetworks` membership: this is
- * meant to be used after the target has already been removed from `ExpansionNetworks` (to
- * stop routine `lz:sdk:wire` runs from reverting the teardown mid-flight), so membership in
- * that array can no longer be relied on. Deployment-artifact existence is the ground truth.
+ * `targetEid` must be listed in `UnwiredNetworks` (see devtools/config/networks.ts) — this is
+ * a deliberate guard rail so an active, still-wired network can't be accidentally targeted.
+ * Marking a network there is also what stops routine `lz:sdk:wire` runs from reverting this
+ * teardown mid-flight, without needing to remove it from `ExpansionNetworks`/`hardhat.config.ts`.
  */
 export async function generateUnwireConfig(
     contractType: 'GlvToken' | 'MarketToken',
@@ -48,6 +49,14 @@ export async function generateUnwireConfig(
     marketPairKey?: string,
     marketPairConfig?: MarketPairConfig
 ): Promise<OAppOmniGraphHardhat> {
+    const isMarkedUnwired = [...UnwiredNetworks.mainnet, ...UnwiredNetworks.testnet].includes(targetEid)
+    if (!isMarkedUnwired) {
+        throw new Error(
+            `EID ${targetEid} is not listed in UnwiredNetworks (devtools/config/networks.ts). ` +
+                `Add it there first — this is a safety check to prevent unwiring an active network by mistake.`
+        )
+    }
+
     const config = marketPairConfig || (await getDeployConfig()).marketPairConfig
     const key = marketPairKey || (await getDeployConfig()).marketPairKey
 

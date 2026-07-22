@@ -6,6 +6,7 @@ import {
     EVM_ENFORCED_OPTIONS_TO_HUB,
     EVM_ENFORCED_OPTIONS_TO_SPOKE,
     OwnershipTransfer,
+    UnwiredNetworks,
 } from '../config'
 import { getDeployConfig, validateHubNetworksNotInExpansion } from '../deploy'
 import { MarketPairConfig } from '../types'
@@ -15,7 +16,7 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/tool
 /**
  * Creates contract configurations for deployment
  */
-function createContracts(contractsToWire: OmniPointHardhat[]): OAppOmniGraphHardhat['contracts'] {
+export function createContracts(contractsToWire: OmniPointHardhat[]): OAppOmniGraphHardhat['contracts'] {
     const skipDelegate = process.env.SKIP_DELEGATE === '1'
 
     return contractsToWire.map((contract) => ({
@@ -98,18 +99,22 @@ export async function generateWireConfig(
 
     // Determine token type and contract names
     const tokenConfig = contractType === 'GlvToken' ? config.GLV : config.GM
-    
+
     if (!tokenConfig) {
-        throw new Error(
-            `${contractType === 'GlvToken' ? 'GLV' : 'GM'} token is not configured for this market pair`
-        )
+        throw new Error(`${contractType === 'GlvToken' ? 'GLV' : 'GM'} token is not configured for this market pair`)
     }
-    
+
     const adapterContractName = `${contractType}_Adapter_${key}`
     const oftContractName = `${contractType}_OFT_${key}`
 
+    // Exclude any network currently being (or already) decommissioned via lz:sdk:unwire, even
+    // though it stays listed in `expansionNetworks` as historical record — see UnwiredNetworks'
+    // doc comment in devtools/config/networks.ts.
+    const unwiredEids = new Set<number>([...UnwiredNetworks.mainnet, ...UnwiredNetworks.testnet])
+    const activeExpansionNetworks = tokenConfig.expansionNetworks.filter((eid) => !unwiredEids.has(eid))
+
     // Include both hub network and expansion networks
-    const allNetworkEids = [tokenConfig.hubNetwork.eid, ...tokenConfig.expansionNetworks]
+    const allNetworkEids = [tokenConfig.hubNetwork.eid, ...activeExpansionNetworks]
     const contractsToWire = allNetworkEids.map(
         (eid): OmniPointHardhat => ({
             eid,

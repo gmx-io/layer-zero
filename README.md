@@ -8,6 +8,7 @@ This project provides a comprehensive deployment and configuration system for GM
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 - [LayerZero Wiring](#layerzero-wiring)
+- [Removing a Network from the Mesh](#removing-a-network-from-the-mesh)
 - [Enhanced Task Commands](#enhanced-task-commands)
 - [Validation](#validation)
 - [Project Structure](#project-structure)
@@ -184,6 +185,127 @@ npx hardhat lz:sdk:wire \
 - **Signer Detection**: Automatically uses the correct deployer (`deployerGM` or `deployerGLV`) from your Hardhat configuration
 - **Config Selection**: Automatically selects the correct LayerZero config file based on token type and stage
 
+## Removing a Network from the Mesh
+
+**Important**: `lz:sdk:wire` only reconciles pathways that are explicitly present in the config file it's given — it never scans on-chain state for pathways that used to exist and resets them. Removing a network from `ExpansionNetworks` would stop _future_ wire runs from touching it, but does **nothing on-chain** by itself, and permanently loses the historical record of what the mesh used to look like. Actually disconnecting a network requires generating transactions that explicitly unset its send/receive libraries and peer, which is what the tooling below does — and it's driven by config rather than deletion, so nothing needs to be removed from `ExpansionNetworks`/`hardhat.config.ts` at all.
+
+### Marking a Network as Unwired
+
+Add the network's eid to `UnwiredNetworks` in `devtools/config/networks.ts` (it stays listed in `ExpansionNetworks` — that array is kept as a permanent historical record of every network that's ever been part of the mesh):
+
+```typescript
+export const UnwiredNetworks = {
+  testnet: [] as EndpointId[],
+  mainnet: [EndpointId.BOTANIX_V2_MAINNET] as EndpointId[],
+};
+```
+
+This one addition does two things simultaneously, and should be the very first step, before generating any payloads:
+
+1. `generateWireConfig` (the normal `lz:sdk:wire` path) excludes any network listed here when building pathways — so a routine wire run for an unrelated market pair can't silently re-wire the network being removed while the staged teardown below is in progress, without deleting anything.
+2. `generateUnwireConfig` (the `lz:sdk:unwire` path) _requires_ its target to be listed here — this is a guard rail against accidentally unwiring a network that's still supposed to be active.
+
+**To reverse a removal at any point**: delete the eid from `UnwiredNetworks` and re-run the normal `lz:sdk:wire` flow — it resolves the correct current ULN302 and DVN addresses dynamically, so there's nothing else to restore. No other file needs to change, since nothing else was ever removed.
+
+### Unwire Phases
+
+Removal is done in three phases, run in this order, with a drain check in between:
+
+1. **`send-block`**: points the send library at LayerZero's `BlockedMessageLib` (a library whose fallback always reverts) on both directions of every pathway between the target network and every other network in the mesh. Stops new messages from being created without affecting anything already in flight, since the receive path is left untouched.
+2. **drain** (not a config phase — see [Checking for In-Flight Messages](#checking-for-in-flight-messages)): wait until there are no pending messages left on any pathway involving the target network.
+3. **`receive-block`**: points the receive library at `BlockedMessageLib` on both directions. Safe to do only once the drain check confirms nothing is left in flight.
+4. **`unpeer`**: calls `setPeer(eid, bytes32(0))` on both directions — the final, cleanest disconnection.
+
+`receive-block` and `unpeer` can be combined into a single Safe batch once the drain check passes (see below) — there's no reason to make them separate multisig executions, since nothing in a healthy mesh depends on receive-blocking landing before unpeering.
+
+### Unwire Command
+
+```bash
+npx hardhat lz:sdk:unwire \
+  --target-network <NETWORK> \
+  --phase <send-block|receive-block|unpeer> \
+  [--market-pair <MARKET_PAIR>] \   # omit to process every market pair deployed to the target network
+  [--token-type <GM|GLV>] \         # omit to process both
+  [--signer <ADDRESS>] \
+  [--generate-payloads] \
+  [--dry-run] \
+  [--assert] \
+  [--ci]
+
+# Examples
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --dry-run
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --generate-payloads --ci --signer 0x0000000000000000000000000000000000000001
+```
+
+### Converting Payloads to a Gnosis Safe Batch
+
+`--generate-payloads` writes a raw dump of the transactions to `payloads/unwire-payloads-<phase>-<network>-<pair>-<type>-<timestamp>.json`, which isn't directly importable into Safe's UI. Convert one or more of these files into a Gnosis Safe Transaction Builder batch (one JSON file per native chain ID) with:
+
+```bash
+npx hardhat lz:sdk:payloads-to-safe \
+  --input <GLOB_OR_COMMA_SEPARATED_LIST> \
+  [--name <NAME>] \
+  [--description <DESCRIPTION>] \
+  [--output-dir payloads] \
+  [--prefix safe-batch]   # output files are written as <prefix>-chain-<id>.json
+
+# Example — combine every send-block payload for a network into per-chain Safe batches
+npx hardhat lz:sdk:payloads-to-safe \
+  --input "payloads/unwire-payloads-send-block-botanix-mainnet-*.json" \
+  --name "Botanix removal - Stage 1: block send" \
+  --prefix stage1-send-block
+
+# Example — combine receive-block and unpeer into one atomic batch per chain
+npx hardhat lz:sdk:payloads-to-safe \
+  --input "payloads/unwire-payloads-receive-block-botanix-mainnet-*.json,payloads/unwire-payloads-unpeer-botanix-mainnet-*.json" \
+  --name "Botanix removal - Stage 3+4: block receive + unpeer" \
+  --prefix stage3-4-receive-unpeer
+```
+
+Give each stage a distinct `--prefix` (default `safe-batch`) — otherwise running the command again for a later stage overwrites the earlier stage's `<prefix>-chain-<id>.json` files, since both would write to the same filenames. Transactions with an identical target contract and calldata are also automatically deduplicated (with a warning), so an `--input` glob accidentally matching more than one stale run of the same market pair/phase can't result in a duplicated call in the batch. Even so, run `rm -rf payloads/` before generating a fresh set to keep the directory (and your glob matches) predictable.
+
+### Checking for In-Flight Messages
+
+Standalone, read-only script — no Hardhat context, RPC URL, or private key required, safe for anyone (including the team executing the Safe transactions) to run at any time:
+
+```bash
+pnpm ts-node scripts/check-inflight-messages.ts --target-network <NETWORK>
+```
+
+It checks every deployed OApp contract on the target network's full message history against [LayerZero's scan API](https://scan.layerzero-api.com) for any message that isn't yet in a terminal state (`DELIVERED`, `BLOCKED`, `APPLICATION_BURNED`, `APPLICATION_SKIPPED`), and prints a final `SAFE to proceed` / `NOT SAFE to proceed` / `INCONCLUSIVE` verdict. Only proceed to `receive-block` once it reports `SAFE`.
+
+### Full Removal Runbook
+
+```bash
+# Step 0 — add the network's eid to UnwiredNetworks in devtools/config/networks.ts
+# (see "Marking a Network as Unwired" above), immediately, before generating any payloads.
+
+# Stage 1 — block send
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --generate-payloads --ci --signer 0x0000000000000000000000000000000000000001
+npx hardhat lz:sdk:payloads-to-safe --input "payloads/unwire-payloads-send-block-botanix-mainnet-*.json" --name "Botanix removal - Stage 1: block send" --prefix stage1-send-block
+# -> hand payloads/stage1-send-block-chain-<id>.json to the team for Safe execution, one per chain
+
+# GATE: wait until Stage 1 has executed on every chain.
+
+# Stage 2 — drain check (repeat until it reports SAFE)
+pnpm ts-node scripts/check-inflight-messages.ts --target-network botanix-mainnet
+
+# Stage 3+4 — block receive + unpeer, combined into one Safe batch per chain
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase receive-block --generate-payloads --ci --signer 0x0000000000000000000000000000000000000001
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase unpeer --generate-payloads --ci --signer 0x0000000000000000000000000000000000000001
+npx hardhat lz:sdk:payloads-to-safe \
+  --input "payloads/unwire-payloads-receive-block-botanix-mainnet-*.json,payloads/unwire-payloads-unpeer-botanix-mainnet-*.json" \
+  --name "Botanix removal - Stage 3+4: block receive + unpeer" \
+  --prefix stage3-4-receive-unpeer
+
+# No cleanup step needed — the network was never removed from ExpansionNetworks or
+# hardhat.config.ts, so there's nothing left to undo once Stage 3+4 executes on-chain.
+```
+
+**To reverse or pause**: any stage is safe to leave in place indefinitely (nothing time-sensitive breaks by stopping after Stage 1, in particular). To fully restore a pathway, delete the network's eid from `UnwiredNetworks` and re-run the normal `lz:sdk:wire` flow — it resolves the correct current ULN302 and DVN addresses dynamically rather than relying on a hardcoded value that could go stale.
+
+Every phase is idempotent in exactly the same way normal wiring is: `lz:sdk:unwire` runs through the identical on-chain diff engine as `lz:sdk:wire` (the same `configureSendLibraries`/`configureReceiveLibraries`/`configureOAppPeers` configurators), so re-running a phase that's already fully applied on-chain reports "no action necessary" and generates zero transactions, rather than re-proposing something already done. Use `--dry-run` (preview, no files written) or `--assert` (fails if any transaction is still required) to check a phase's status before generating payloads for it.
+
 ## Enhanced Task Commands
 
 The project includes enhanced Hardhat tasks that simplify deployment and wiring operations with better logging and streamlined workflows.
@@ -233,6 +355,17 @@ npx hardhat lz:sdk:wire --market-pair WETH_USDC --token-type GM --signer 0x1234.
 npx hardhat lz:sdk:wire --market-pair WETH_USDC --gm-signer 0x1111... --glv-signer 0x2222...
 npx hardhat lz:sdk:wire --market-pair WETH_USDC --generate-payloads
 npx hardhat lz:sdk:wire --market-pair WETH_USDC --dryRun
+```
+
+### Unwiring Tasks
+
+See [Removing a Network from the Mesh](#removing-a-network-from-the-mesh) for the full staged process.
+
+```bash
+# Examples
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --dry-run
+npx hardhat lz:sdk:unwire --target-network botanix-mainnet --phase send-block --generate-payloads --ci
+npx hardhat lz:sdk:payloads-to-safe --input "payloads/unwire-payloads-send-block-botanix-mainnet-*.json" --name "Stage 1: block send" --prefix stage1-send-block
 ```
 
 ### Ownership Transfer Tasks
@@ -375,7 +508,7 @@ npx hardhat lz:sdk:display-deployments
 
 ## Project Structure
 
-```
+```text
 ├── devtools/                    # Development utilities
 │   ├── config/                  # Configuration data
 │   │   ├── networks.ts          # Network settings (confirmations, ownership)
@@ -386,8 +519,13 @@ npx hardhat lz:sdk:display-deployments
 │   │   ├── utils.ts             # Deploy helper functions
 │   │   └── index.ts
 │   ├── wire/                    # LayerZero wire generation
-│   │   ├── wire-generator.ts    # Wire configuration generator
+│   │   ├── wire-generator.ts    # Wire configuration generator (full mesh)
+│   │   ├── unwire-generator.ts  # Unwire configuration generator (send-block/receive-block/unpeer)
+│   │   ├── blocked-library.ts   # Resolves each chain's BlockedMessageLib address
 │   │   ├── config.ts            # Wire-specific configs
+│   │   └── index.ts
+│   ├── payloads/                # Raw payload -> Gnosis Safe batch conversion
+│   │   ├── to-safe-batch.ts
 │   │   └── index.ts
 │   ├── types.ts                 # TypeScript interfaces
 │   └── index.ts                 # Main devtools export
@@ -397,14 +535,22 @@ npx hardhat lz:sdk:display-deployments
 ├── tasks/                       # Enhanced Hardhat tasks (lz:sdk:* commands)
 │   ├── deploy-wrapper.ts        # Enhanced deploy command
 │   ├── wire-wrapper.ts          # Enhanced wire command
+│   ├── unwire-wrapper.ts        # Chain-removal wire command (send-block/receive-block/unpeer)
+│   ├── payloads-to-safe-wrapper.ts  # Converts raw payloads into Gnosis Safe Transaction Builder JSON
 │   ├── ownership-wrapper.ts     # Enhanced ownership transfer command
 │   ├── validate-deployments.ts  # Deployment validation with quoteSend testing
 │   ├── validate-config.ts       # Configuration validation
 │   ├── display-deployments.ts   # Deployment display utilities
 │   ├── vape-send-tokens.ts      # Token sending utilities
 │   └── index.ts                 # Task exports
+├── scripts/
+│   ├── check-inflight-messages.ts  # Read-only scan-API check before unpeering a network
+│   ├── standard-json-generator.ts
+│   └── verify-contracts.ts
 ├── payloads/                    # Generated transaction payloads (created automatically)
-│   └── wire-payloads-*.json     # Multisig transaction payloads
+│   ├── wire-payloads-*.json     # Raw multisig transaction payloads (wire/unwire)
+│   ├── unwire-payloads-*.json
+│   └── safe-batch-chain-*.json  # Gnosis Safe Transaction Builder batches, one per chain
 ├── deployments/                 # Hardhat deployment artifacts
 │   ├── arbitrum-mainnet/        # Network-specific deployments
 │   ├── base-mainnet/
@@ -413,6 +559,7 @@ npx hardhat lz:sdk:display-deployments
 ├── layerzero.gm.testnet.config.ts    # GM testnet LayerZero configuration
 ├── layerzero.glv.mainnet.config.ts   # GLV mainnet LayerZero configuration
 ├── layerzero.glv.testnet.config.ts   # GLV testnet LayerZero configuration
+├── layerzero.unwire.config.ts        # Chain-removal LayerZero configuration
 └── hardhat.config.ts                 # Hardhat configuration with named accounts
 ```
 
@@ -450,7 +597,7 @@ export const Tokens: Config = {
 };
 ```
 
-2. Deploy with new market pair:
+1. Deploy with new market pair:
 
 ```bash
 npx hardhat lz:sdk:deploy --market-pair WETH_USDC
@@ -479,7 +626,7 @@ export const ExpansionNetworks = {
 };
 ```
 
-2. Update `hardhat.config.ts`:
+1. Update `hardhat.config.ts`:
 
 ```typescript
 networks: {
@@ -578,13 +725,36 @@ npx hardhat lz:sdk:deploy --stage mainnet --market-pair WETH_USDC
 npx hardhat lz:sdk:wire --market-pair WETH_USDC
 ```
 
+### Remove Network
+
+See [Removing a Network from the Mesh](#removing-a-network-from-the-mesh) for the full staged runbook — summarized:
+
+```bash
+# 1. Add the network's eid to UnwiredNetworks in devtools/config/networks.ts
+#    (it stays in ExpansionNetworks and hardhat.config.ts — nothing is deleted)
+
+# 2. Stage 1: block send, then hand the Safe batch to the team for execution
+npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase send-block --generate-payloads --ci
+npx hardhat lz:sdk:payloads-to-safe --input "payloads/unwire-payloads-send-block-<NETWORK>-*.json" --name "Stage 1" --prefix stage1-send-block
+
+# 3. Confirm nothing is left in flight (repeat until it reports SAFE)
+pnpm ts-node scripts/check-inflight-messages.ts --target-network <NETWORK>
+
+# 4. Stage 3+4: block receive + unpeer, combined into one Safe batch, then execute
+npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase receive-block --generate-payloads --ci
+npx hardhat lz:sdk:unwire --target-network <NETWORK> --phase unpeer --generate-payloads --ci
+npx hardhat lz:sdk:payloads-to-safe --input "payloads/unwire-payloads-receive-block-<NETWORK>-*.json,payloads/unwire-payloads-unpeer-<NETWORK>-*.json" --name "Stage 3+4" --prefix stage3-4-receive-unpeer
+
+# No cleanup step — nothing was removed, so there's nothing to undo.
+```
+
 ### Verify Contracts
 
 Two methods to verify contracts are available.
 
 #### Standard JSON Files
 
-Manually verify contract in block explorers by generating standard JSON files (https://docs.soliditylang.org/en/latest/using-the-compiler.html#compiler-api).
+Manually verify contract in block explorers by generating standard JSON files (<https://docs.soliditylang.org/en/latest/using-the-compiler.html#compiler-api>).
 
 ```bash
 pnpm ts-node scripts/standard-json-generator.ts
@@ -614,6 +784,7 @@ pnpm ts-node scripts/verify-contracts.ts botanix-mainnet --force
 4. **Hub in Expansion Networks**: Hub network EID found in expansion networks (validation error)
 5. **Wire Conflicts**: Ensure hub networks aren't in expansion network lists
 6. **Signer Not Found**: Ensure `deployerGM` and `deployerGLV` are configured in your Hardhat named accounts
+7. **Unexpected transaction count in a Safe batch**: `lz:sdk:unwire --generate-payloads` writes a new timestamped file every run and never deletes old ones. If `lz:sdk:payloads-to-safe --input`'s glob matches more than one run of the same market pair/phase, duplicate transactions are automatically dropped (with a warning), but it's still worth running `rm -rf payloads/` before generating a fresh set so your glob only ever matches what you intend
 
 ### Validation Error Example
 

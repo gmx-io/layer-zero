@@ -73,6 +73,22 @@ const BTC_BTC: MarketPairConfig = {
     },
 }
 
+const USDG_USDG: MarketPairConfig = {
+    GLV: {
+        tokenSymbol: 'GLV [USDG-USDG]',
+        hubNetwork: {
+            eid: EndpointId.ARBITRUM_V2_MAINNET,
+            contractAddress: '0x4Cd5A94a30876320ac65F2e192493EE476f13866',
+        },
+        expansionNetworks: [
+            EndpointId.BASE_V2_MAINNET,
+            EndpointId.BSC_V2_MAINNET,
+            EndpointId.ETHEREUM_V2_MAINNET,
+            EndpointId.ROBINHOOD_V2_MAINNET,
+        ],
+    },
+}
+
 const WETH_USDC_SG: MarketPairConfig = {
     GM: {
         tokenSymbol: 'GM WETH-USDC.SG',
@@ -100,5 +116,6 @@ export const Tokens: Config = {
     WBTC_USDC,
     WETH_WETH,
     BTC_BTC,
+    USDG_USDG,
     WETH_USDC_SG,
 }

@@ -81,6 +81,11 @@ const config: HardhatUserConfig = {
             url: process.env.RPC_URL_ETHEREUM_MAINNET || 'https://mainnet.gateway.tenderly.co',
             accounts,
         },
+        'robinhood-mainnet': {
+            eid: EndpointId.ROBINHOOD_V2_MAINNET,
+            url: process.env.RPC_URL_ROBINHOOD_MAINNET || 'https://rpc.mainnet.chain.robinhood.com',
+            accounts,
+        },
         'sepolia-testnet': {
             eid: EndpointId.SEPOLIA_V2_TESTNET,
             url: process.env.RPC_URL_ETHEREUM_TESTNET || 'https://rpc.sepolia.org/',

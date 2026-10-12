@@ -80,8 +80,6 @@ const USDG_USDG: MarketPairConfig = {
             eid: EndpointId.ARBITRUM_V2_MAINNET,
             contractAddress: '0x4Cd5A94a30876320ac65F2e192493EE476f13866',
         },
-        // Explicit list instead of ExpansionNetworks.mainnet: no Bera, plus Robinhood,
-        // without pulling Robinhood into the existing market pairs' meshes
         expansionNetworks: [
             EndpointId.BASE_V2_MAINNET,
             EndpointId.BSC_V2_MAINNET,

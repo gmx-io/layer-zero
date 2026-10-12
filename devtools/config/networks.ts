@@ -11,7 +11,7 @@ export const BlockConfirmations: Partial<Record<EndpointId, number>> = {
     [EndpointId.BOTANIX_V2_MAINNET]: 2,
     [EndpointId.BSC_V2_MAINNET]: 20,
     [EndpointId.ETHEREUM_V2_MAINNET]: 15,
-    [EndpointId.ROBINHOOD_V2_MAINNET]: 5, // LZ default send confirmations on Robinhood
+    [EndpointId.ROBINHOOD_V2_MAINNET]: 5,
 
     // Testnet networks
     [EndpointId.ARBSEP_V2_TESTNET]: 1,
@@ -29,8 +29,7 @@ export const OwnershipTransfer: Partial<Record<EndpointId, string>> = {
     [EndpointId.BOTANIX_V2_MAINNET]: '0x656fa39BdB5984b477FA6aB443195D72D1Accc1c',
     [EndpointId.BSC_V2_MAINNET]: '0x8D1d2e24eC641eDC6a1ebe0F3aE7af0EBC573e0D',
     [EndpointId.ETHEREUM_V2_MAINNET]: '0x8D1d2e24eC641eDC6a1ebe0F3aE7af0EBC573e0D',
-    // TODO: GMX Safe on Robinhood is not deployed yet (0x8D1d...e0D has no code on chain 4663)
-    // [EndpointId.ROBINHOOD_V2_MAINNET]: '',
+    // TODO: Robinhood Safe not deployed yet
 
     // Testnet networks
     [EndpointId.ARBSEP_V2_TESTNET]: '0xCD9706B6B71fdC4351091B5b1D910cEe7Fde28D0',
